@@ -1,0 +1,126 @@
+// prisma/schema.prisma
+// SERVER ONLY — nunca importar en Client Components
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// PAGE — documento tipo Notion (contenido en bloques JSON)
+// ---------------------------------------------------------------------------
+model Page {
+  id        String   @id @default(cuid())
+  title     String   @default("Sin título")
+  icon      String?  // emoji o URL de icono
+  cover     String?  // URL de imagen de portada
+
+  // Contenido serializado de BlockNote (array de bloques)
+  content   Json?
+
+  // Jerarquía de páginas (árbol anidado)
+  parentId  String?
+  parent    Page?    @relation("PageTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Page[]   @relation("PageTree")
+
+  // Bases de datos embebidas en esta página
+  databases Database[]
+
+  isDeleted Boolean  @default(false)
+  position  Int      @default(0) // orden dentro del mismo padre
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentId])
+  @@index([isDeleted])
+}
+
+// ---------------------------------------------------------------------------
+// DATABASE — colección de registros con campos tipados (tipo "table" de Notion)
+// ---------------------------------------------------------------------------
+model Database {
+  id                  String   @id @default(cuid())
+  title               String   @default("Base de datos sin título")
+  icon                String?
+  viewType            ViewType @default(TABLE)
+  kanbanGroupFieldId  String?  // ID del campo SELECT usado para agrupar columnas Kanban
+
+  // La página que contiene esta base de datos (puede ser null = standalone)
+  pageId  String?
+  page    Page?   @relation(fields: [pageId], references: [id], onDelete: SetNull)
+
+  fields  Field[]
+  records Record[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([pageId])
+}
+
+enum ViewType {
+  TABLE
+  KANBAN
+  CALENDAR
+}
+
+// ---------------------------------------------------------------------------
+// FIELD — columna/propiedad de una Database
+// ---------------------------------------------------------------------------
+model Field {
+  id         String    @id @default(cuid())
+  name       String
+  type       FieldType @default(TEXT)
+  position   Int       @default(0)
+
+  // Opciones para tipo SELECT / MULTI_SELECT (array de {value, color})
+  options    Json?
+
+  databaseId String
+  database   Database  @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([databaseId])
+}
+
+enum FieldType {
+  TEXT
+  NUMBER
+  DATE
+  SELECT
+  MULTI_SELECT
+  CHECKBOX
+  URL
+  EMAIL
+}
+
+// ---------------------------------------------------------------------------
+// RECORD — fila de una Database; los valores se guardan en JSONB flexible
+// Los valores son un objeto { fieldId: value, ... }
+// ---------------------------------------------------------------------------
+model Record {
+  id         String   @id @default(cuid())
+  position   Int      @default(0)
+
+  // JSONB: { "<fieldId>": <value> }
+  // Ejemplo: { "cld123": "Tarea 1", "cld456": "2024-01-01", "cld789": true }
+  values     Json     @default("{}")
+
+  databaseId String
+  database   Database @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+  isDeleted  Boolean  @default(false)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([databaseId])
+  @@index([isDeleted])
+}

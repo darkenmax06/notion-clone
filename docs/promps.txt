@@ -1,0 +1,20 @@
+ok, analiza los documentos de la carpeta: C:\Users\ramse\Documents\Proyectos Ramses\ramtion\docs
+Analiza el contexto del desarrollo de la app y en base a eso crea lo que se indica a continuacion (siguiendo los patrones de diseño y las instrucciones espesificadas en los documentos de la carpeta:
+
+Fase 3 — Base de datos & Tablas (Días 7–11)
+Modelo: Database → Fields → Records (JSONB flexible)
+Server Actions para mutations
+Vista tabla con columnas editables
+Tipos: Text, Number, Date, Select, Checkbox
+Filtros, ordenamiento, inline editing
+Detail view por registro
+
+Luego de eso. realiza test unitarios y de integracion.
+Comprueba que todo funcione y que esta nueva implementacion no afecte a alguna funcionalidad previa.
+Actualiza la respectiva documentacion de la carpeta Docs
+Habilita un servidor de prueba para una revision humana en docker (con datos de prueba)
+
+Y espera la confirmacion humana de si se hace commit y push o no.
+
+
+
