@@ -151,16 +151,19 @@ function CellDisplay({ type, value, options }: { type: FieldType; value: unknown
   return <span className="text-sm text-gray-800 dark:text-gray-200">{String(value)}</span>;
 }
 
+// Parse YYYY-MM-DD components directly — avoids UTC-vs-local timezone shift
+// that causes SSR/client hydration mismatches with new Date("YYYY-MM-DD").
+const MONTHS_ES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+
 function formatDateInput(value: unknown): string {
-  const str = String(value ?? "");
-  if (!str) return "";
-  const d = new Date(str);
-  if (isNaN(d.getTime())) return str;
-  return d.toISOString().slice(0, 10);
+  const str = String(value ?? "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(str) ? str : "";
 }
 
 function formatDateDisplay(str: string): string {
-  const d = new Date(str);
-  if (isNaN(d.getTime())) return str;
-  return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+  const parts = str.slice(0, 10).split("-");
+  if (parts.length !== 3) return str;
+  const [y, m, d] = parts.map(Number);
+  if (!y || !m || !d || m < 1 || m > 12) return str;
+  return `${String(d).padStart(2, "0")} ${MONTHS_ES[m - 1]} ${y}`;
 }
