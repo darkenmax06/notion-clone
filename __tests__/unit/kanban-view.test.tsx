@@ -11,6 +11,7 @@ jest.mock("@dnd-kit/core", () => ({
   useSensor: jest.fn(() => ({})),
   useSensors: jest.fn((...args: unknown[]) => args),
   closestCorners: jest.fn(),
+  useDroppable: () => ({ setNodeRef: jest.fn(), isOver: false }),
 }));
 
 jest.mock("@dnd-kit/sortable", () => ({

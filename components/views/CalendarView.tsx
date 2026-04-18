@@ -48,8 +48,10 @@ function getDateField(fields: FieldRow[]): FieldRow | undefined {
   return fields.find((f) => f.type === FieldType.DATE);
 }
 
-function getTimeField(fields: FieldRow[]): FieldRow | undefined {
-  return fields.find((f) => f.type === FieldType.TIME);
+/** Returns [startTimeField, endTimeField] from all TIME fields in order. */
+function getTimeFields(fields: FieldRow[]): [FieldRow | undefined, FieldRow | undefined] {
+  const timeFields = fields.filter((f) => f.type === FieldType.TIME);
+  return [timeFields[0], timeFields[1]];
 }
 
 function getTitleField(fields: FieldRow[]): FieldRow | undefined {
@@ -60,16 +62,31 @@ function getSelectField(fields: FieldRow[]): FieldRow | undefined {
   return fields.find((f) => f.type === FieldType.SELECT);
 }
 
-function parseTime(timeStr: string): { hours: number; minutes: number } | null {
-  const match = timeStr.match(/^(\d{1,2}):(\d{2})/);
-  if (!match) return null;
-  return { hours: parseInt(match[1], 10), minutes: parseInt(match[2], 10) };
+function parseTime(str: string): { hours: number; minutes: number } | null {
+  const m = str.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  return { hours: parseInt(m[1], 10), minutes: parseInt(m[2], 10) };
+}
+
+/** Build a local Date from a YYYY-MM-DD string + optional HH:MM string. */
+function buildDate(dateStr: string, timeStr?: string): Date {
+  const [y, mo, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, mo - 1, d); // local noon as default
+  if (timeStr) {
+    const t = parseTime(timeStr);
+    if (t) date.setHours(t.hours, t.minutes, 0, 0);
+    else date.setHours(12, 0, 0, 0);
+  } else {
+    date.setHours(12, 0, 0, 0);
+  }
+  return date;
 }
 
 function buildEvents(
   records: RecordRow[],
   dateField: FieldRow,
-  timeField: FieldRow | undefined,
+  startTimeField: FieldRow | undefined,
+  endTimeField: FieldRow | undefined,
   titleField: FieldRow | undefined,
   selectField: FieldRow | undefined
 ): CalendarEvent[] {
@@ -79,23 +96,31 @@ function buildEvents(
       return raw && String(raw).length >= 10;
     })
     .map((r) => {
-      const dateRaw = String(r.values[dateField.id]).slice(0, 10);
-      const timeRaw = timeField ? String(r.values[timeField.id] ?? "") : "";
-      const parsed = timeRaw ? parseTime(timeRaw) : null;
+      const dateRaw      = String(r.values[dateField.id]).slice(0, 10);
+      const startTimeRaw = startTimeField ? String(r.values[startTimeField.id] ?? "") : "";
+      const endTimeRaw   = endTimeField   ? String(r.values[endTimeField.id]   ?? "") : "";
+
+      const hasStartTime = Boolean(startTimeRaw && parseTime(startTimeRaw));
+      const hasEndTime   = Boolean(endTimeRaw   && parseTime(endTimeRaw));
 
       let start: Date;
       let end: Date;
       let allDay: boolean;
 
-      if (parsed) {
-        start = new Date(`${dateRaw}T00:00:00`);
-        start.setHours(parsed.hours, parsed.minutes, 0, 0);
-        end = new Date(start);
-        end.setHours(end.getHours() + 1); // 1-hour duration by default
+      if (hasStartTime) {
+        start = buildDate(dateRaw, startTimeRaw);
+        if (hasEndTime) {
+          end = buildDate(dateRaw, endTimeRaw);
+          // guard: end must be after start
+          if (end <= start) end = new Date(start.getTime() + 60 * 60 * 1000);
+        } else {
+          end = new Date(start.getTime() + 60 * 60 * 1000); // default +1h
+        }
         allDay = false;
       } else {
-        start = new Date(`${dateRaw}T12:00:00`);
-        end = start;
+        // no time → full-day event
+        start  = buildDate(dateRaw);
+        end    = start;
         allDay = true;
       }
 
@@ -107,15 +132,7 @@ function buildEvents(
       const color =
         selectField?.options?.find((o) => o.value === statusValue)?.color ?? "#6366f1";
 
-      return {
-        recordId: r.id,
-        title,
-        start,
-        end,
-        allDay,
-        color,
-        resource: r,
-      } as CalendarEvent;
+      return { recordId: r.id, title, start, end, allDay, color, resource: r } as CalendarEvent;
     });
 }
 
@@ -123,25 +140,20 @@ function buildEvents(
 // CalendarView
 // ---------------------------------------------------------------------------
 
-export default function CalendarView({
-  fields,
-  records,
-  onAddRecord,
-  onSelectRecord,
-}: Props) {
+export default function CalendarView({ fields, records, onAddRecord, onSelectRecord }: Props) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentView, setCurrentView] = useState<string>(Views.MONTH);
 
-  const dateField  = useMemo(() => getDateField(fields),  [fields]);
-  const timeField  = useMemo(() => getTimeField(fields),  [fields]);
-  const titleField = useMemo(() => getTitleField(fields), [fields]);
+  const dateField   = useMemo(() => getDateField(fields),    [fields]);
+  const [startTimeField, endTimeField] = useMemo(() => getTimeFields(fields), [fields]);
+  const titleField  = useMemo(() => getTitleField(fields),  [fields]);
   const selectField = useMemo(() => getSelectField(fields), [fields]);
 
   const events = useMemo(
     () => dateField
-      ? buildEvents(records, dateField, timeField, titleField, selectField)
+      ? buildEvents(records, dateField, startTimeField, endTimeField, titleField, selectField)
       : [],
-    [records, dateField, timeField, titleField, selectField]
+    [records, dateField, startTimeField, endTimeField, titleField, selectField]
   );
 
   const handleSelectSlot = useCallback(
@@ -181,21 +193,35 @@ export default function CalendarView({
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden p-6">
-      <div className="mb-3 flex items-center gap-2 flex-wrap">
+      {/* Info bar */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <p className="text-xs text-gray-400">
           Eventos del campo <strong>{dateField.name}</strong>
-          {timeField && (
-            <> · Hora desde <strong>{timeField.name}</strong></>
+          {startTimeField && (
+            <>
+              {" "}· Inicio: <strong>{startTimeField.name}</strong>
+            </>
+          )}
+          {endTimeField && (
+            <>
+              {" "}· Fin: <strong>{endTimeField.name}</strong>
+            </>
           )}
           {selectField && (
-            <> · Color por <strong>{selectField.name}</strong></>
+            <>
+              {" "}· Color: <strong>{selectField.name}</strong>
+            </>
           )}
         </p>
-        {timeField && (
+
+        {startTimeField && (
           <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300">
-            Vista semana/día muestra hora exacta
+            {endTimeField
+              ? "Vista semana/día muestra hora exacta con duración"
+              : "Vista semana/día muestra hora exacta"}
           </span>
         )}
+
         <button
           onClick={() => onAddRecord(currentDate)}
           className="ml-auto flex items-center gap-1 rounded bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700"
@@ -206,6 +232,7 @@ export default function CalendarView({
         </button>
       </div>
 
+      {/* Calendar */}
       <div
         className="flex-1 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
         style={{ minHeight: 500 }}
