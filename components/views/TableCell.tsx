@@ -87,7 +87,10 @@ export function TableCell({ type, value, options = [], isEditing, onStartEdit, o
   }
 
   const inputType =
-    type === "NUMBER" ? "number" : type === "DATE" ? "date" : "text";
+    type === "NUMBER" ? "number"
+    : type === "DATE" ? "date"
+    : type === "TIME" ? "time"
+    : "text";
 
   return (
     <input
@@ -139,6 +142,10 @@ function CellDisplay({ type, value, options }: { type: FieldType; value: unknown
     const str = String(value);
     if (!str) return null;
     return <span className="text-sm text-gray-700 dark:text-gray-300">{formatDateDisplay(str)}</span>;
+  }
+
+  if (type === "TIME") {
+    return <span className="text-sm tabular-nums text-gray-700 dark:text-gray-300">{String(value)}</span>;
   }
 
   return <span className="text-sm text-gray-800 dark:text-gray-200">{String(value)}</span>;

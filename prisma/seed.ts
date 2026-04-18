@@ -295,11 +295,15 @@ async function main() {
     data: { name: "Fecha", type: "DATE", position: 1, databaseId: eventDb.id },
   });
 
+  const evTimeField = await prisma.field.create({
+    data: { name: "Hora", type: "TIME", position: 2, databaseId: eventDb.id },
+  });
+
   const evTypeField = await prisma.field.create({
     data: {
       name: "Tipo",
       type: "SELECT",
-      position: 2,
+      position: 3,
       options: [
         { value: "Reunión", color: "#6366f1" },
         { value: "Entrega", color: "#ef4444" },
@@ -311,7 +315,7 @@ async function main() {
   });
 
   const evNotesField = await prisma.field.create({
-    data: { name: "Notas", type: "TEXT", position: 3, databaseId: eventDb.id },
+    data: { name: "Notas", type: "TEXT", position: 4, databaseId: eventDb.id },
   });
 
   await prisma.record.createMany({
@@ -321,6 +325,7 @@ async function main() {
         values: {
           [evNameField.id]: "Kick-off Phase 4",
           [evDateField.id]: "2026-04-12",
+          [evTimeField.id]: "09:00",
           [evTypeField.id]: "Reunión",
           [evNotesField.id]: "Inicio del sprint de Kanban y Calendario",
         },
@@ -331,6 +336,7 @@ async function main() {
         values: {
           [evNameField.id]: "Review Kanban",
           [evDateField.id]: "2026-04-18",
+          [evTimeField.id]: "11:30",
           [evTypeField.id]: "Review",
           [evNotesField.id]: "Revisión del drag-and-drop",
         },
@@ -341,6 +347,7 @@ async function main() {
         values: {
           [evNameField.id]: "Entrega Phase 4",
           [evDateField.id]: "2026-04-22",
+          [evTimeField.id]: "17:00",
           [evTypeField.id]: "Entrega",
           [evNotesField.id]: "Kanban + Calendario completos",
         },
@@ -351,6 +358,7 @@ async function main() {
         values: {
           [evNameField.id]: "Demo cliente",
           [evDateField.id]: "2026-04-25",
+          [evTimeField.id]: "15:00",
           [evTypeField.id]: "Demo",
           [evNotesField.id]: "Presentación del MVP",
         },
@@ -361,6 +369,7 @@ async function main() {
         values: {
           [evNameField.id]: "Sprint Planning May",
           [evDateField.id]: "2026-04-30",
+          [evTimeField.id]: "10:00",
           [evTypeField.id]: "Reunión",
           [evNotesField.id]: "Planificación Phase 5",
         },
@@ -371,6 +380,7 @@ async function main() {
         values: {
           [evNameField.id]: "Standup diario",
           [evDateField.id]: "2026-04-19",
+          [evTimeField.id]: "09:30",
           [evTypeField.id]: "Reunión",
           [evNotesField.id]: "Sync del equipo",
         },
@@ -381,8 +391,30 @@ async function main() {
         values: {
           [evNameField.id]: "Code review tests",
           [evDateField.id]: "2026-04-21",
+          [evTimeField.id]: "14:00",
           [evTypeField.id]: "Review",
           [evNotesField.id]: "Review de la suite de tests",
+        },
+        databaseId: eventDb.id,
+      },
+      {
+        position: 7,
+        values: {
+          [evNameField.id]: "Almuerzo de equipo",
+          [evDateField.id]: "2026-04-23",
+          [evTimeField.id]: "13:00",
+          [evTypeField.id]: "Reunión",
+          [evNotesField.id]: "Team building",
+        },
+        databaseId: eventDb.id,
+      },
+      {
+        position: 8,
+        values: {
+          [evNameField.id]: "Evento sin hora (todo el día)",
+          [evDateField.id]: "2026-04-24",
+          [evTypeField.id]: "Demo",
+          [evNotesField.id]: "Sin campo hora — aparece como evento de todo el día",
         },
         databaseId: eventDb.id,
       },
@@ -463,7 +495,7 @@ async function main() {
   console.log("   - 6 páginas (3 raíz + 3 sub-páginas)");
   console.log("   - 3 bases de datos:");
   console.log("     · Tareas del proyecto: 6 campos, 9 registros [KANBAN]");
-  console.log("     · Eventos del mes: 4 campos, 7 registros [CALENDAR]");
+  console.log("     · Eventos del mes: 5 campos (incl. Hora TIME), 9 registros [CALENDAR]");
   console.log("     · Contactos: 4 campos, 3 registros [TABLE]");
 }
 

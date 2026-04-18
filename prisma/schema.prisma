@@ -94,6 +94,7 @@ enum FieldType {
   TEXT
   NUMBER
   DATE
+  TIME
   SELECT
   MULTI_SELECT
   CHECKBOX

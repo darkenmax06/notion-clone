@@ -9,6 +9,7 @@ const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: "TEXT", label: "Texto" },
   { value: "NUMBER", label: "Número" },
   { value: "DATE", label: "Fecha" },
+  { value: "TIME", label: "Hora" },
   { value: "SELECT", label: "Selección" },
   { value: "CHECKBOX", label: "Casilla" },
 ];
