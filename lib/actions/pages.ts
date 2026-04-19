@@ -74,7 +74,8 @@ export async function updatePage(input: z.infer<typeof UpdatePageSchema>) {
     where: { id },
     data: {
       ...(data.title !== undefined && { title: data.title }),
-      ...(data.content !== undefined && { content: sanitizeContent(data.content) }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ...(data.content !== undefined && { content: sanitizeContent(data.content) as any }),
       ...(data.icon !== undefined && { icon: data.icon }),
       ...(data.cover !== undefined && { cover: data.cover }),
     },

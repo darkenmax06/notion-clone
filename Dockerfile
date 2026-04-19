@@ -20,7 +20,7 @@ WORKDIR /app
 
 # Copiar todas las dependencias (incluyendo dev) para el build
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copiar código fuente
 COPY . .
@@ -56,10 +56,16 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Copiar Prisma para migraciones en runtime (opcional)
+# Copiar Prisma (schema + cliente generado + CLI para db push en runtime)
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
+
+# Entrypoint: db push + start
+COPY --from=builder /app/docker/entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
 
 USER nextjs
 
@@ -67,5 +73,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Ejecutar migraciones y luego arrancar el servidor
-CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]
+CMD ["sh", "./entrypoint.sh"]

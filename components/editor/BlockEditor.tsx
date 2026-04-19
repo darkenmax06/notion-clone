@@ -42,12 +42,16 @@ export default function BlockEditor({ pageId, initialContent, onTitleChange }: P
 
         // Extraer título del primer bloque de tipo heading o paragraph
         const firstBlock = blocks[0];
-        const titleText =
-          firstBlock?.content
-            ?.flatMap((c: { type: string; text?: string }) =>
-              c.type === "text" ? [c.text ?? ""] : []
-            )
-            .join("") ?? "";
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const content = firstBlock?.content as any;
+        const titleText: string =
+          Array.isArray(content)
+            ? content
+                .flatMap((c: { type: string; text?: string }) =>
+                  c.type === "text" ? [c.text ?? ""] : []
+                )
+                .join("")
+            : "";
 
         await updatePage({
           id: pageId,

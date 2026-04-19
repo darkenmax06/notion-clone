@@ -201,7 +201,7 @@ function KanbanCard({
           <p className="truncate text-sm font-medium text-gray-800 dark:text-gray-100">
             {title}
           </p>
-          {dateValue && (
+          {!!dateValue && (
             <p className="mt-1 text-xs text-gray-400">
               {String(dateValue).slice(0, 10)}
             </p>

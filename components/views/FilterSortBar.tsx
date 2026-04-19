@@ -76,6 +76,11 @@ const OPERATORS_BY_TYPE: Record<FieldType, { value: FilterOperator; label: strin
     { value: "contains", label: "contiene" },
     { value: "equals", label: "es igual a" },
   ],
+  TIME: [
+    { value: "equals", label: "es" },
+    { value: "before", label: "antes de" },
+    { value: "after", label: "después de" },
+  ],
 };
 
 export function FilterSortBar({ fields, filters, onFiltersChange, sortConfig, onSortChange }: Props) {

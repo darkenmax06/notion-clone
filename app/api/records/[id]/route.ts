@@ -19,7 +19,8 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 
     const record = await prisma.record.update({
       where: { id },
-      data: { values },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      data: { values: values as any },
     });
 
     return NextResponse.json({ record });

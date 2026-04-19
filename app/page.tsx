@@ -1,4 +1,5 @@
 // app/page.tsx — Página de bienvenida / home (Server Component)
+export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";

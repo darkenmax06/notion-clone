@@ -33,7 +33,8 @@ export async function updateRecord(
 ) {
   const record = await prisma.record.update({
     where: { id: recordId },
-    data: { values },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    data: { values: values as any },
   });
 
   return { success: true, record };

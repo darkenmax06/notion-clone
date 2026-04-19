@@ -66,7 +66,7 @@ export function SidebarClient({ initialTree, initialDatabases }: Props) {
   // ---------------------------------------------------------------------------
   async function handleCreatePage(parentId: string | null = null) {
     startTransition(async () => {
-      const result = await createPage({ parentId });
+      const result = await createPage({ title: "Sin título", parentId });
       if (result.success) {
         const newNode: PageNode = {
           id: result.page.id,

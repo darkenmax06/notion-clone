@@ -237,7 +237,7 @@ export default function DatabaseView({ database, fields: initialFields, records:
     startTransition(async () => {
       const result = await createField(database.id, { name, type, options });
       if (result.success) {
-        setFields((prev) => [...prev, result.field as FieldRow]);
+        setFields((prev) => [...prev, result.field as unknown as FieldRow]);
       }
     });
   }

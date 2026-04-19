@@ -242,13 +242,14 @@ export default function CalendarView({ fields, records, onAddRecord, onSelectRec
           localizer={localizer}
           events={events}
           date={currentDate}
-          view={currentView as Parameters<typeof Calendar>[0]["view"]}
+          view={currentView as "month" | "week" | "day" | "agenda"}
           onNavigate={setCurrentDate}
           onView={setCurrentView}
           selectable
           onSelectSlot={handleSelectSlot}
           onSelectEvent={handleSelectEvent as (event: Event) => void}
-          eventPropGetter={eventStyleGetter as Parameters<typeof Calendar>[0]["eventPropGetter"]}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          eventPropGetter={eventStyleGetter as any}
           messages={{
             next: "›",
             previous: "‹",
