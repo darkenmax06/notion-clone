@@ -103,11 +103,11 @@ export default function SearchModal() {
       onClick={() => setOpen(false)}
     >
       <div
-        className="w-full max-w-lg rounded-xl border border-gray-200 bg-white shadow-2xl overflow-hidden"
+        className="w-full max-w-lg rounded-xl border border-gray-200 bg-white shadow-2xl overflow-hidden dark:border-gray-700 dark:bg-gray-900"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Input */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
           <Search className="h-4 w-4 shrink-0 text-gray-400" />
           <input
             ref={inputRef}
@@ -115,7 +115,7 @@ export default function SearchModal() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Buscar páginas y bases de datos…"
-            className="flex-1 bg-transparent text-sm text-gray-900 placeholder-gray-400 outline-none"
+            className="flex-1 bg-transparent text-sm text-gray-900 placeholder-gray-400 outline-none dark:text-gray-100 dark:placeholder-gray-500"
           />
           <button
             onClick={() => setOpen(false)}

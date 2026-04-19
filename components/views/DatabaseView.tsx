@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition, useMemo, useRef } from "react";
+import { useState, useTransition, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { FieldType } from "@prisma/client";
-import { Plus, Trash2, ExternalLink, Download, ChevronDown } from "lucide-react";
+import { Plus, Trash2, ExternalLink, Download, ChevronDown, Smile } from "lucide-react";
 import { createField, updateField, deleteField, updateDatabase } from "@/lib/actions/databases";
 import { createRecord, updateRecord, deleteRecord } from "@/lib/actions/records";
 import { TableCell, type SelectOption } from "./TableCell";
@@ -107,14 +107,31 @@ export default function DatabaseView({ database, fields: initialFields, records:
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(database.title);
+  const [editingIcon, setEditingIcon] = useState(false);
+  const [iconState, setIconState] = useState(database.icon ?? "");
+  const [iconDraft, setIconDraft] = useState(database.icon ?? "");
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const iconInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  // Sync con servidor cuando router.refresh() trae props nuevos
+  useEffect(() => { setTitleDraft(database.title); }, [database.title]);
+  useEffect(() => { setIconState(database.icon ?? ""); }, [database.icon]);
 
   async function commitTitleRename() {
     const title = titleDraft.trim() || "Sin título";
     setEditingTitle(false);
     setTitleDraft(title);
     await updateDatabase(database.id, { title });
+    router.refresh();
+  }
+
+  async function commitIconEdit(value?: string) {
+    const icon = (value ?? iconDraft).trim();
+    setIconState(icon);
+    setEditingIcon(false);
+    await updateDatabase(database.id, { icon: icon || null });
+    router.refresh();
   }
 
   const sortedFields = useMemo(
@@ -245,7 +262,46 @@ export default function DatabaseView({ database, fields: initialFields, records:
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="flex items-center gap-2 px-6 py-4">
-        {database.icon && <span className="text-3xl">{database.icon}</span>}
+        {/* Icono editable */}
+        {editingIcon ? (
+          <div className="flex items-center gap-2">
+            <input
+              ref={iconInputRef}
+              value={iconDraft}
+              onChange={(e) => setIconDraft(e.target.value)}
+              onBlur={() => commitIconEdit()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitIconEdit();
+                if (e.key === "Escape") { setEditingIcon(false); setIconDraft(iconState); }
+              }}
+              placeholder="Emoji…"
+              maxLength={8}
+              className="w-20 rounded border border-blue-400 bg-white px-2 py-1 text-center text-2xl text-gray-900 outline-none dark:bg-gray-900 dark:text-gray-100"
+              autoFocus
+            />
+            <button
+              onMouseDown={(e) => { e.preventDefault(); commitIconEdit(""); }}
+              className="text-xs text-gray-400 underline hover:text-red-500"
+            >
+              Quitar
+            </button>
+          </div>
+        ) : iconState ? (
+          <button
+            onClick={() => { setIconDraft(iconState); setEditingIcon(true); setTimeout(() => iconInputRef.current?.focus(), 20); }}
+            title="Cambiar icono"
+            className="text-3xl transition-opacity hover:opacity-70"
+          >
+            {iconState}
+          </button>
+        ) : (
+          <button
+            onClick={() => { setIconDraft(""); setEditingIcon(true); setTimeout(() => iconInputRef.current?.focus(), 20); }}
+            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+          >
+            <Smile size={14} /> Añadir icono
+          </button>
+        )}
         {editingTitle ? (
           <input
             ref={titleInputRef}

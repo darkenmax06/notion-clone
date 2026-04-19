@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Smile } from "lucide-react";
 import { updatePage } from "@/lib/actions/pages";
@@ -21,6 +21,17 @@ export default function PageTitleEditor({ pageId, initialTitle, icon: initialIco
   const titleInputRef = useRef<HTMLInputElement>(null);
   const iconInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  // Sincroniza con el servidor cuando router.refresh() trae datos nuevos
+  useEffect(() => {
+    setTitle(initialTitle);
+    setTitleDraft(initialTitle);
+  }, [initialTitle]);
+
+  useEffect(() => {
+    setIcon(initialIcon ?? "");
+    setIconDraft(initialIcon ?? "");
+  }, [initialIcon]);
 
   async function commitTitle() {
     const newTitle = titleDraft.trim() || "Sin título";
@@ -67,7 +78,7 @@ export default function PageTitleEditor({ pageId, initialTitle, icon: initialIco
               }}
               placeholder="Escribe un emoji…"
               maxLength={8}
-              className="w-28 rounded border border-blue-400 bg-white px-2 py-1 text-center text-2xl outline-none dark:bg-gray-900"
+              className="w-28 rounded border border-blue-400 bg-white px-2 py-1 text-center text-2xl text-gray-900 outline-none dark:bg-gray-900 dark:text-gray-100"
               autoFocus
             />
             <button

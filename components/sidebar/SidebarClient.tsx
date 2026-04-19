@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createPage, deletePage, updatePage } from "@/lib/actions/pages";
@@ -56,6 +56,10 @@ export function SidebarClient({ initialTree, initialDatabases }: Props) {
   const [renameDraft, setRenameDraft] = useState("");
   const dbInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  // Sincroniza estado local cuando el servidor refresca los props
+  useEffect(() => { setTree(initialTree); }, [initialTree]);
+  useEffect(() => { setDatabases(initialDatabases); }, [initialDatabases]);
 
   // ---------------------------------------------------------------------------
   // Crear página — update optimista inmediato, sin router.refresh()
@@ -118,6 +122,7 @@ export function SidebarClient({ initialTree, initialDatabases }: Props) {
     setDatabases((prev) => prev.map((d) => (d.id === id ? { ...d, title } : d)));
     setRenamingDbId(null);
     await updateDatabase(id, { title });
+    router.refresh();
   }
 
   function cancelRenameDb() {
@@ -276,6 +281,7 @@ function PageTreeNode({
   const [isRenaming, setIsRenaming] = useState(false);
   const [draft, setDraft] = useState(node.title);
   const inputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
   const hasChildren = node.children && node.children.length > 0;
 
   function startRename() {
@@ -289,6 +295,7 @@ function PageTreeNode({
     setIsRenaming(false);
     onRename(node.id, title);
     await updatePage({ id: node.id, title });
+    router.refresh();
   }
 
   return (
