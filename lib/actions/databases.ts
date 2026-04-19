@@ -59,7 +59,7 @@ export async function createDatabase(
     include: { fields: true },
   });
 
-  revalidatePath("/");
+  revalidatePath("/", "layout");
   return { success: true, database: db };
 }
 
@@ -80,6 +80,7 @@ export async function updateDatabase(
   });
 
   revalidatePath(`/db/${id}`);
+  revalidatePath("/", "layout");
   return { success: true, database: db };
 }
 
@@ -116,6 +117,7 @@ export async function createField(
   });
 
   revalidatePath(`/db/${databaseId}`);
+  revalidatePath("/", "layout");
   return { success: true, field };
 }
 
@@ -135,6 +137,7 @@ export async function updateField(
   });
 
   revalidatePath(`/db/${databaseId}`);
+  revalidatePath("/", "layout");
   return { success: true, field };
 }
 

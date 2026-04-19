@@ -50,7 +50,7 @@ export async function createPage(input: z.infer<typeof CreatePageSchema>) {
     },
   });
 
-  revalidatePath("/");
+  revalidatePath("/", "layout");
   return { success: true, page };
 }
 
@@ -80,8 +80,8 @@ export async function updatePage(input: z.infer<typeof UpdatePageSchema>) {
     },
   });
 
-  // Revalidar la ruta de la página específica
   revalidatePath(`/page/${id}`);
+  revalidatePath("/", "layout");
   return { success: true, page };
 }
 

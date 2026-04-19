@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import type { Block } from "@blocknote/core";
 import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/Breadcrumb";
 import BlockEditorClient from "@/components/editor/BlockEditorClient";
+import PageTitleEditor from "@/components/editor/PageTitleEditor";
 
 async function getAncestors(pageId: string): Promise<BreadcrumbItem[]> {
   const ancestors: BreadcrumbItem[] = [];
@@ -56,12 +57,7 @@ export default async function PageDetail({ params }: Props) {
 
       <Breadcrumb items={breadcrumbs} />
 
-      <div className="mx-auto w-full max-w-3xl px-4 pt-10">
-        {page.icon && <div className="mb-2 text-5xl">{page.icon}</div>}
-        <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
-          {page.title}
-        </h1>
-      </div>
+      <PageTitleEditor pageId={page.id} initialTitle={page.title} icon={page.icon} />
 
       <BlockEditorClient
         pageId={page.id}
