@@ -3,7 +3,7 @@
 // CLIENT COMPONENT — BlockNote con dynamic import (ssr: false) y autosave debounce
 // Importar este componente con dynamic() en las páginas para evitar SSR errors
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
@@ -22,6 +22,17 @@ const AUTOSAVE_DELAY = 1000;
 export default function BlockEditor({ pageId, initialContent, onTitleChange }: Props) {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRef = useRef<string>("");
+
+  const [isDark, setIsDark] = useState(false);
+  useEffect(() => {
+    const html = document.documentElement;
+    setIsDark(html.classList.contains("dark"));
+    const observer = new MutationObserver(() => {
+      setIsDark(html.classList.contains("dark"));
+    });
+    observer.observe(html, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
 
   // Inicializar BlockNote con contenido existente o vacío
   const editor = useCreateBlockNote({
@@ -79,7 +90,7 @@ export default function BlockEditor({ pageId, initialContent, onTitleChange }: P
       <BlockNoteView
         editor={editor}
         onChange={() => scheduleSave(editor.document)}
-        theme="light"
+        theme={isDark ? "dark" : "light"}
       />
     </div>
   );
