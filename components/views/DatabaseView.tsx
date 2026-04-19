@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import { useState, useTransition, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { FieldType } from "@prisma/client";
 import { Plus, Trash2, ExternalLink, Download, ChevronDown } from "lucide-react";
@@ -105,7 +105,17 @@ export default function DatabaseView({ database, fields: initialFields, records:
   );
   const [isPending, startTransition] = useTransition();
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(database.title);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  async function commitTitleRename() {
+    const title = titleDraft.trim() || "Sin título";
+    setEditingTitle(false);
+    setTitleDraft(title);
+    await updateDatabase(database.id, { title });
+  }
 
   const sortedFields = useMemo(
     () => [...fields].sort((a, b) => a.position - b.position),
@@ -236,7 +246,32 @@ export default function DatabaseView({ database, fields: initialFields, records:
       {/* Header */}
       <div className="flex items-center gap-2 px-6 py-4">
         {database.icon && <span className="text-3xl">{database.icon}</span>}
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex-1">{database.title}</h1>
+        {editingTitle ? (
+          <input
+            ref={titleInputRef}
+            value={titleDraft}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={commitTitleRename}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitTitleRename();
+              if (e.key === "Escape") { setEditingTitle(false); setTitleDraft(database.title); }
+            }}
+            className="flex-1 text-2xl font-bold text-gray-900 dark:text-gray-100 bg-transparent border-b-2 border-blue-400 outline-none"
+            autoFocus
+          />
+        ) : (
+          <h1
+            className="flex-1 text-2xl font-bold text-gray-900 dark:text-gray-100 cursor-text hover:opacity-80"
+            title="Clic para renombrar"
+            onClick={() => {
+              setTitleDraft(database.title);
+              setEditingTitle(true);
+              setTimeout(() => titleInputRef.current?.select(), 20);
+            }}
+          >
+            {titleDraft}
+          </h1>
+        )}
 
         {/* Export dropdown */}
         <div className="relative">

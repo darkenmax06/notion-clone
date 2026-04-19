@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createPage, deletePage } from "@/lib/actions/pages";
-import { createDatabase, deleteDatabase } from "@/lib/actions/databases";
+import { createPage, deletePage, updatePage } from "@/lib/actions/pages";
+import { createDatabase, deleteDatabase, updateDatabase } from "@/lib/actions/databases";
 import type { PageNode, DatabaseItem } from "./SidebarServer";
 import {
   ChevronRight,
@@ -14,6 +14,7 @@ import {
   FileText,
   Table2,
   Database,
+  Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +28,9 @@ export function SidebarClient({ initialTree, initialDatabases }: Props) {
   const [databases, setDatabases] = useState<DatabaseItem[]>(initialDatabases);
   const [isPending, startTransition] = useTransition();
   const [dbSectionOpen, setDbSectionOpen] = useState(true);
+  const [renamingDbId, setRenamingDbId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const dbInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
   const refreshTree = () => router.refresh();
@@ -49,6 +53,23 @@ export function SidebarClient({ initialTree, initialDatabases }: Props) {
         router.push(`/db/${result.database.id}`);
       }
     });
+  }
+
+  function startRenameDb(db: DatabaseItem) {
+    setRenamingDbId(db.id);
+    setRenameDraft(db.title);
+    setTimeout(() => dbInputRef.current?.select(), 20);
+  }
+
+  async function commitRenameDb(id: string) {
+    const title = renameDraft.trim() || "Sin título";
+    setDatabases((prev) => prev.map((d) => (d.id === id ? { ...d, title } : d)));
+    setRenamingDbId(null);
+    await updateDatabase(id, { title });
+  }
+
+  function cancelRenameDb() {
+    setRenamingDbId(null);
   }
 
   return (
@@ -84,6 +105,9 @@ export function SidebarClient({ initialTree, initialDatabases }: Props) {
                   await deletePage({ id });
                   refreshTree();
                 });
+              }}
+              onRename={(id, title) => {
+                setTree((prev) => updateNodeTitle(prev, id, title));
               }}
             />
           ))
@@ -122,30 +146,57 @@ export function SidebarClient({ initialTree, initialDatabases }: Props) {
                   key={db.id}
                   className="group flex items-center gap-1 rounded px-2 py-1 text-sm hover:bg-gray-200 dark:hover:bg-gray-800"
                 >
-                  <Link
-                    href={`/db/${db.id}`}
-                    className="flex flex-1 items-center gap-1.5 truncate text-gray-700 dark:text-gray-300"
-                  >
-                    {db.icon ? (
-                      <span className="text-base">{db.icon}</span>
-                    ) : (
-                      <Table2 size={14} className="shrink-0 text-gray-400" />
-                    )}
-                    <span className="truncate text-sm">{db.title || "Sin título"}</span>
-                  </Link>
+                  {renamingDbId === db.id ? (
+                    /* Inline rename input */
+                    <input
+                      ref={dbInputRef}
+                      value={renameDraft}
+                      onChange={(e) => setRenameDraft(e.target.value)}
+                      onBlur={() => commitRenameDb(db.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitRenameDb(db.id);
+                        if (e.key === "Escape") cancelRenameDb();
+                      }}
+                      className="flex-1 rounded border border-blue-400 bg-white px-1 text-sm text-gray-900 outline-none dark:bg-gray-900 dark:text-gray-100"
+                      autoFocus
+                    />
+                  ) : (
+                    <>
+                      <Link
+                        href={`/db/${db.id}`}
+                        className="flex flex-1 items-center gap-1.5 truncate text-gray-700 dark:text-gray-300"
+                      >
+                        {db.icon ? (
+                          <span className="text-base">{db.icon}</span>
+                        ) : (
+                          <Table2 size={14} className="shrink-0 text-gray-400" />
+                        )}
+                        <span className="truncate text-sm">{db.title || "Sin título"}</span>
+                      </Link>
 
-                  <button
-                    onClick={() =>
-                      startTransition(async () => {
-                        await deleteDatabase(db.id);
-                        setDatabases((prev) => prev.filter((d) => d.id !== db.id));
-                      })
-                    }
-                    title="Eliminar base de datos"
-                    className="hidden shrink-0 rounded p-0.5 text-gray-400 hover:text-red-500 group-hover:block"
-                  >
-                    <Trash2 size={12} />
-                  </button>
+                      <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+                        <button
+                          onClick={() => startRenameDb(db)}
+                          title="Renombrar"
+                          className="rounded p-0.5 text-gray-400 hover:text-blue-500"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                        <button
+                          onClick={() =>
+                            startTransition(async () => {
+                              await deleteDatabase(db.id);
+                              setDatabases((prev) => prev.filter((d) => d.id !== db.id));
+                            })
+                          }
+                          title="Eliminar base de datos"
+                          className="rounded p-0.5 text-gray-400 hover:text-red-500"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
@@ -157,7 +208,19 @@ export function SidebarClient({ initialTree, initialDatabases }: Props) {
 }
 
 // ---------------------------------------------------------------------------
-// PageTreeNode — recursive component (unchanged)
+// Helpers
+// ---------------------------------------------------------------------------
+
+function updateNodeTitle(nodes: PageNode[], id: string, title: string): PageNode[] {
+  return nodes.map((n) =>
+    n.id === id
+      ? { ...n, title }
+      : { ...n, children: n.children ? updateNodeTitle(n.children, id, title) : n.children }
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PageTreeNode — con rename inline
 // ---------------------------------------------------------------------------
 
 function PageTreeNode({
@@ -165,14 +228,37 @@ function PageTreeNode({
   depth,
   onCreateChild,
   onDelete,
+  onRename,
 }: {
   node: PageNode;
   depth: number;
   onCreateChild: (parentId: string) => void;
   onDelete: (id: string) => void;
+  onRename: (id: string, title: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [draft, setDraft] = useState(node.title);
+  const inputRef = useRef<HTMLInputElement>(null);
   const hasChildren = node.children && node.children.length > 0;
+
+  function startRename() {
+    setDraft(node.title);
+    setIsRenaming(true);
+    setTimeout(() => inputRef.current?.select(), 20);
+  }
+
+  async function commitRename() {
+    const title = draft.trim() || "Sin título";
+    setIsRenaming(false);
+    onRename(node.id, title);
+    await updatePage({ id: node.id, title });
+  }
+
+  function cancelRename() {
+    setIsRenaming(false);
+    setDraft(node.title);
+  }
 
   return (
     <div>
@@ -188,34 +274,58 @@ function PageTreeNode({
           )}
         </button>
 
-        <Link
-          href={`/page/${node.id}`}
-          className="flex flex-1 items-center gap-1.5 truncate text-gray-700 dark:text-gray-300"
-        >
-          {node.icon ? (
-            <span>{node.icon}</span>
-          ) : (
-            <FileText size={14} className="shrink-0 text-gray-400" />
-          )}
-          <span className="truncate">{node.title || "Sin título"}</span>
-        </Link>
+        {isRenaming ? (
+          <input
+            ref={inputRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commitRename}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitRename();
+              if (e.key === "Escape") cancelRename();
+            }}
+            className="flex-1 rounded border border-blue-400 bg-white px-1 text-sm text-gray-900 outline-none dark:bg-gray-900 dark:text-gray-100"
+            autoFocus
+          />
+        ) : (
+          <>
+            <Link
+              href={`/page/${node.id}`}
+              className="flex flex-1 items-center gap-1.5 truncate text-gray-700 dark:text-gray-300"
+            >
+              {node.icon ? (
+                <span>{node.icon}</span>
+              ) : (
+                <FileText size={14} className="shrink-0 text-gray-400" />
+              )}
+              <span className="truncate">{node.title || "Sin título"}</span>
+            </Link>
 
-        <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
-          <button
-            onClick={() => onCreateChild(node.id)}
-            title="Añadir subpágina"
-            className="rounded p-0.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-          >
-            <Plus size={12} />
-          </button>
-          <button
-            onClick={() => onDelete(node.id)}
-            title="Eliminar página"
-            className="rounded p-0.5 text-gray-400 hover:text-red-500"
-          >
-            <Trash2 size={12} />
-          </button>
-        </div>
+            <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+              <button
+                onClick={startRename}
+                title="Renombrar"
+                className="rounded p-0.5 text-gray-400 hover:text-blue-500"
+              >
+                <Pencil size={12} />
+              </button>
+              <button
+                onClick={() => onCreateChild(node.id)}
+                title="Añadir subpágina"
+                className="rounded p-0.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              >
+                <Plus size={12} />
+              </button>
+              <button
+                onClick={() => onDelete(node.id)}
+                title="Eliminar página"
+                className="rounded p-0.5 text-gray-400 hover:text-red-500"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {expanded && hasChildren && (
@@ -227,6 +337,7 @@ function PageTreeNode({
               depth={depth + 1}
               onCreateChild={onCreateChild}
               onDelete={onDelete}
+              onRename={onRename}
             />
           ))}
         </div>
