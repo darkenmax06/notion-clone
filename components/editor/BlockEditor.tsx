@@ -12,6 +12,7 @@ import { updatePage } from "@/lib/actions/pages";
 
 type Props = {
   pageId: string;
+  initialTitle?: string;
   initialContent?: Block[] | null;
   onTitleChange?: (title: string) => void;
 };
@@ -19,9 +20,11 @@ type Props = {
 // Tiempo de espera (ms) antes de guardar tras el último cambio
 const AUTOSAVE_DELAY = 1000;
 
-export default function BlockEditor({ pageId, initialContent, onTitleChange }: Props) {
+export default function BlockEditor({ pageId, initialTitle, initialContent, onTitleChange }: Props) {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRef = useRef<string>("");
+  // true cuando el usuario ya puso un título propio (distinto del default)
+  const titleIsCustomRef = useRef(!!initialTitle && initialTitle !== "Sin título");
 
   const [isDark, setIsDark] = useState(false);
   useEffect(() => {
@@ -64,13 +67,15 @@ export default function BlockEditor({ pageId, initialContent, onTitleChange }: P
                 .join("")
             : "";
 
+        const shouldUpdateTitle = titleText && !titleIsCustomRef.current;
+
         await updatePage({
           id: pageId,
           content: blocks,
-          ...(titleText && { title: titleText }),
+          ...(shouldUpdateTitle && { title: titleText }),
         });
 
-        if (titleText && onTitleChange) {
+        if (shouldUpdateTitle && onTitleChange) {
           onTitleChange(titleText);
         }
       }, AUTOSAVE_DELAY);

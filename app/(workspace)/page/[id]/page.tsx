@@ -62,6 +62,7 @@ export default async function PageDetail({ params }: Props) {
 
       <BlockEditorClient
         pageId={page.id}
+        initialTitle={page.title}
         initialContent={(page.content as Block[] | null) ?? undefined}
       />
     </main>

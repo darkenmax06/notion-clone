@@ -12,9 +12,10 @@ const BlockEditor = dynamic(() => import("@/components/editor/BlockEditor"), {
 
 type Props = {
   pageId: string;
+  initialTitle?: string;
   initialContent?: Block[];
 };
 
-export default function BlockEditorClient({ pageId, initialContent }: Props) {
-  return <BlockEditor pageId={pageId} initialContent={initialContent} />;
+export default function BlockEditorClient({ pageId, initialTitle, initialContent }: Props) {
+  return <BlockEditor pageId={pageId} initialTitle={initialTitle} initialContent={initialContent} />;
 }
