@@ -3,7 +3,7 @@
 import { useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { FieldType } from "@prisma/client";
-import { Plus, Trash2, ExternalLink } from "lucide-react";
+import { Plus, Trash2, ExternalLink, Download, ChevronDown } from "lucide-react";
 import { createField, updateField, deleteField, updateDatabase } from "@/lib/actions/databases";
 import { createRecord, updateRecord, deleteRecord } from "@/lib/actions/records";
 import { TableCell, type SelectOption } from "./TableCell";
@@ -104,6 +104,7 @@ export default function DatabaseView({ database, fields: initialFields, records:
     database.kanbanGroupFieldId ?? null
   );
   const [isPending, startTransition] = useTransition();
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const router = useRouter();
 
   const sortedFields = useMemo(
@@ -235,7 +236,42 @@ export default function DatabaseView({ database, fields: initialFields, records:
       {/* Header */}
       <div className="flex items-center gap-2 px-6 py-4">
         {database.icon && <span className="text-3xl">{database.icon}</span>}
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{database.title}</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex-1">{database.title}</h1>
+
+        {/* Export dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowExportMenu((v) => !v)}
+            className="flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+          >
+            <Download size={13} />
+            Exportar
+            <ChevronDown size={13} />
+          </button>
+          {showExportMenu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
+              <div className="absolute right-0 z-20 mt-1 w-40 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                <a
+                  href={`/api/databases/${database.id}/export?format=csv`}
+                  download
+                  onClick={() => setShowExportMenu(false)}
+                  className="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  <Download size={12} /> Exportar CSV
+                </a>
+                <a
+                  href={`/api/databases/${database.id}/export?format=md`}
+                  download
+                  onClick={() => setShowExportMenu(false)}
+                  className="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  <Download size={12} /> Exportar Markdown
+                </a>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* View selector */}

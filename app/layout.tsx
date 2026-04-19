@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import SidebarServer from "@/components/sidebar/SidebarServer";
+import GlobalProviders from "@/components/GlobalProviders";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -28,6 +29,9 @@ export default function RootLayout({
         <div className="flex flex-1 flex-col overflow-y-auto">
           {children}
         </div>
+
+        {/* Providers globales de cliente: SearchModal (⌘K), etc. */}
+        <GlobalProviders />
       </body>
     </html>
   );

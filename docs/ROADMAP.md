@@ -183,13 +183,42 @@ date-fns ^3.x
 @types/react-big-calendar ^1.x
 ```
 
-## Fase 5 — Polish & Docker Production (Días 18–21)
-- Docker con 2 servicios: nextjs standalone + postgres
-- Dockerfile multi-stage con output standalone de Next.js
-- Search global full-text (pg_trgm)
-- Export a Markdown / CSV
-- Atajos de teclado (⌘K, etc.)
-- Backup automático de DB
+## Fase 5 — Polish & Docker Production (Días 18–21) ✅
+- [x] Docker con 2 servicios: nextjs standalone + postgres — `docker-compose.prod.yml`
+- [x] Dockerfile multi-stage con output standalone de Next.js (ya existente, validado)
+- [x] Search global full-text (pg_trgm) — `app/api/search/route.ts` + `docker/init.sql`
+- [x] Export a Markdown / CSV — `app/api/databases/[id]/export/route.ts` + `app/api/pages/[id]/export/route.ts`
+- [x] Atajos de teclado (⌘K) — `lib/hooks/useKeyboardShortcuts.ts` + `components/search/SearchModal.tsx`
+- [x] Backup automático de DB — `scripts/backup.sh` (cron 02:00 UTC, retención 7 días)
+- [x] Tests unitarios: `keyboard-shortcuts.test.ts`, `search-modal.test.tsx`
+- [x] Tests de integración: `api-search.test.ts`, `api-export-db.test.ts`
+- [x] Suite completa: 181 tests, 0 fallos (sin regresiones en Fases 1-4)
+
+### Arquitectura Fase 5
+```
+app/api/
+  search/route.ts                     ← GET ?q= → pg_trgm similarity + fallback ILIKE
+  databases/[id]/export/route.ts      ← GET ?format=csv|md → descarga directa
+  pages/[id]/export/route.ts          ← GET → BlockNote JSON → Markdown
+components/
+  search/SearchModal.tsx              ← Command palette ⌘K (Client Component)
+  GlobalProviders.tsx                 ← Client wrapper montado en layout
+lib/hooks/
+  useKeyboardShortcuts.ts             ← Hook genérico: { "meta+k": fn }
+docker/
+  init.sql                            ← CREATE EXTENSION IF NOT EXISTS pg_trgm
+scripts/
+  backup.sh                           ← pg_dump | gzip + rotación 7 días
+docker-compose.prod.yml               ← Producción: standalone build + backup cron
+__tests__/
+  unit/keyboard-shortcuts.test.ts
+  unit/search-modal.test.tsx
+  integration/api-search.test.ts
+  integration/api-export-db.test.ts
+```
+
+### Dependencias añadidas (Fase 5)
+Ninguna nueva — Phase 5 reutiliza la infraestructura existente.
 
 ---
 

@@ -1,0 +1,77 @@
+##############################################################################
+# docker-compose.prod.yml — Producción: standalone build + postgres + backup
+# Uso: docker compose -f docker-compose.prod.yml up -d
+##############################################################################
+
+services:
+  # ---------------------------------------------------------------------------
+  # postgres — PostgreSQL 16 con pg_trgm habilitado desde init.sql
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: notionlocal_postgres_prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-notionlocal}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_in_production}
+      POSTGRES_DB: ${POSTGRES_DB:-notionlocal}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-notionlocal} -d ${POSTGRES_DB:-notionlocal}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # nextjs — Next.js standalone (imagen construida desde Dockerfile multi-stage)
+  # ---------------------------------------------------------------------------
+  nextjs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DATABASE_URL: postgresql://${POSTGRES_USER:-notionlocal}:${POSTGRES_PASSWORD:-changeme_in_production}@postgres:5432/${POSTGRES_DB:-notionlocal}
+    image: notionlocal:latest
+    container_name: notionlocal_app_prod
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-notionlocal}:${POSTGRES_PASSWORD:-changeme_in_production}@postgres:5432/${POSTGRES_DB:-notionlocal}
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # backup — Cron diario a las 02:00 UTC con retención 7 días
+  # ---------------------------------------------------------------------------
+  backup:
+    image: postgres:16-alpine
+    container_name: notionlocal_backup
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-notionlocal}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_in_production}
+      POSTGRES_DB: ${POSTGRES_DB:-notionlocal}
+      BACKUP_DIR: /backups
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup.sh:/backup.sh:ro
+    command: >
+      sh -c "chmod +x /backup.sh &&
+             echo '0 2 * * * /backup.sh >> /var/log/backup.log 2>&1' | crontab - &&
+             crond -f -d 8"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

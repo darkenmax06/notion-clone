@@ -3,6 +3,10 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
+  // Habilitar pg_trgm para búsqueda full-text (idempotente)
+  await prisma.$executeRaw`CREATE EXTENSION IF NOT EXISTS pg_trgm`;
+  console.log("✓ Extensión pg_trgm habilitada");
+
   console.log("Limpiando datos existentes…");
   await prisma.record.deleteMany();
   await prisma.field.deleteMany();
