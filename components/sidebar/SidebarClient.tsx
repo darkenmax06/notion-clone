@@ -23,6 +23,30 @@ type Props = {
   initialDatabases: DatabaseItem[];
 };
 
+// ---------------------------------------------------------------------------
+// Helpers para árbol
+// ---------------------------------------------------------------------------
+
+function addNodeToTree(nodes: PageNode[], parentId: string, newNode: PageNode): PageNode[] {
+  return nodes.map((n) =>
+    n.id === parentId
+      ? { ...n, children: [...(n.children ?? []), newNode] }
+      : { ...n, children: n.children ? addNodeToTree(n.children, parentId, newNode) : n.children }
+  );
+}
+
+function updateNodeTitle(nodes: PageNode[], id: string, title: string): PageNode[] {
+  return nodes.map((n) =>
+    n.id === id
+      ? { ...n, title }
+      : { ...n, children: n.children ? updateNodeTitle(n.children, id, title) : n.children }
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SidebarClient
+// ---------------------------------------------------------------------------
+
 export function SidebarClient({ initialTree, initialDatabases }: Props) {
   const [tree, setTree] = useState<PageNode[]>(initialTree);
   const [databases, setDatabases] = useState<DatabaseItem[]>(initialDatabases);
@@ -33,28 +57,56 @@ export function SidebarClient({ initialTree, initialDatabases }: Props) {
   const dbInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
-  const refreshTree = () => router.refresh();
-
+  // ---------------------------------------------------------------------------
+  // Crear página — update optimista inmediato, sin router.refresh()
+  // ---------------------------------------------------------------------------
   async function handleCreatePage(parentId: string | null = null) {
     startTransition(async () => {
       const result = await createPage({ parentId });
       if (result.success) {
-        refreshTree();
+        const newNode: PageNode = {
+          id: result.page.id,
+          title: result.page.title,
+          icon: result.page.icon ?? null,
+          parentId,
+          position: result.page.position,
+          children: [],
+        };
+
+        setTree((prev) =>
+          parentId === null
+            ? [...prev, newNode]
+            : addNodeToTree(prev, parentId, newNode)
+        );
+
         router.push(`/page/${result.page.id}`);
       }
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // Crear base de datos — update optimista inmediato
+  // ---------------------------------------------------------------------------
   async function handleCreateDatabase() {
     startTransition(async () => {
       const result = await createDatabase({ title: "Base de datos sin título" });
       if (result.success) {
-        refreshTree();
+        setDatabases((prev) => [
+          ...prev,
+          {
+            id: result.database.id,
+            title: result.database.title,
+            icon: result.database.icon ?? null,
+          },
+        ]);
         router.push(`/db/${result.database.id}`);
       }
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // Rename DB
+  // ---------------------------------------------------------------------------
   function startRenameDb(db: DatabaseItem) {
     setRenamingDbId(db.id);
     setRenameDraft(db.title);
@@ -90,7 +142,7 @@ export function SidebarClient({ initialTree, initialDatabases }: Props) {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-1">
-        {/* Pages section */}
+        {/* Pages */}
         {tree.length === 0 ? (
           <p className="px-2 py-4 text-xs text-gray-400">Sin páginas. Crea una con +</p>
         ) : (
@@ -100,20 +152,18 @@ export function SidebarClient({ initialTree, initialDatabases }: Props) {
               node={node}
               depth={0}
               onCreateChild={handleCreatePage}
-              onDelete={async (id) => {
+              onDelete={(id) => {
                 startTransition(async () => {
                   await deletePage({ id });
-                  refreshTree();
+                  router.refresh();
                 });
               }}
-              onRename={(id, title) => {
-                setTree((prev) => updateNodeTitle(prev, id, title));
-              }}
+              onRename={(id, title) => setTree((prev) => updateNodeTitle(prev, id, title))}
             />
           ))
         )}
 
-        {/* Databases section */}
+        {/* Databases */}
         <div className="mt-4">
           <button
             onClick={() => setDbSectionOpen((v) => !v)}
@@ -147,7 +197,6 @@ export function SidebarClient({ initialTree, initialDatabases }: Props) {
                   className="group flex items-center gap-1 rounded px-2 py-1 text-sm hover:bg-gray-200 dark:hover:bg-gray-800"
                 >
                   {renamingDbId === db.id ? (
-                    /* Inline rename input */
                     <input
                       ref={dbInputRef}
                       value={renameDraft}
@@ -173,7 +222,6 @@ export function SidebarClient({ initialTree, initialDatabases }: Props) {
                         )}
                         <span className="truncate text-sm">{db.title || "Sin título"}</span>
                       </Link>
-
                       <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
                         <button
                           onClick={() => startRenameDb(db)}
@@ -208,19 +256,7 @@ export function SidebarClient({ initialTree, initialDatabases }: Props) {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function updateNodeTitle(nodes: PageNode[], id: string, title: string): PageNode[] {
-  return nodes.map((n) =>
-    n.id === id
-      ? { ...n, title }
-      : { ...n, children: n.children ? updateNodeTitle(n.children, id, title) : n.children }
-  );
-}
-
-// ---------------------------------------------------------------------------
-// PageTreeNode — con rename inline
+// PageTreeNode
 // ---------------------------------------------------------------------------
 
 function PageTreeNode({
@@ -255,16 +291,11 @@ function PageTreeNode({
     await updatePage({ id: node.id, title });
   }
 
-  function cancelRename() {
-    setIsRenaming(false);
-    setDraft(node.title);
-  }
-
   return (
     <div>
       <div
-        className={cn("group flex items-center gap-1 rounded px-2 py-1 text-sm hover:bg-gray-200 dark:hover:bg-gray-800")}
-        style={{ paddingLeft: `${8 + depth * 16}px` }}
+        className={cn("group flex items-center gap-1 rounded py-1 text-sm hover:bg-gray-200 dark:hover:bg-gray-800")}
+        style={{ paddingLeft: `${8 + depth * 16}px`, paddingRight: "8px" }}
       >
         <button onClick={() => setExpanded((v) => !v)} className="shrink-0 text-gray-400">
           {hasChildren ? (
@@ -282,7 +313,7 @@ function PageTreeNode({
             onBlur={commitRename}
             onKeyDown={(e) => {
               if (e.key === "Enter") commitRename();
-              if (e.key === "Escape") cancelRename();
+              if (e.key === "Escape") { setIsRenaming(false); setDraft(node.title); }
             }}
             className="flex-1 rounded border border-blue-400 bg-white px-1 text-sm text-gray-900 outline-none dark:bg-gray-900 dark:text-gray-100"
             autoFocus
