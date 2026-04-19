@@ -55,7 +55,7 @@ export function FieldHeader({ field, onRename, onDelete }: Props) {
               if (e.key === "Enter") commitRename();
               if (e.key === "Escape") { setDraft(field.name); setEditing(false); }
             }}
-            className="w-full border-0 bg-transparent text-xs outline-none"
+            className="w-full border-0 bg-transparent text-xs text-gray-900 outline-none dark:text-gray-100"
           />
         ) : (
           <span className="flex-1 truncate">{field.name}</span>

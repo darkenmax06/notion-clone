@@ -103,7 +103,7 @@ export function AddFieldModal({ onClose, onCreate }: Props) {
                     value={opt.value}
                     onChange={(e) => updateOption(i, { value: e.target.value })}
                     placeholder={`Opción ${i + 1}`}
-                    className="flex-1 rounded border border-gray-200 px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-800"
+                    className="flex-1 rounded border border-gray-200 px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                   />
                   <button type="button" onClick={() => removeOption(i)} className="text-red-400 hover:text-red-600">
                     <Trash2 size={12} />

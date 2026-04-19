@@ -159,7 +159,7 @@ export function FilterSortBar({ fields, filters, onFiltersChange, sortConfig, on
                     const newOps = OPERATORS_BY_TYPE[newField.type];
                     updateFilter(rule.id, { fieldId: e.target.value, operator: newOps[0].value, value: "" });
                   }}
-                  className="rounded border border-gray-200 bg-white px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-700"
+                  className="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                 >
                   {fields.map((f) => (
                     <option key={f.id} value={f.id}>{f.name}</option>
@@ -169,7 +169,7 @@ export function FilterSortBar({ fields, filters, onFiltersChange, sortConfig, on
                 <select
                   value={rule.operator}
                   onChange={(e) => updateFilter(rule.id, { operator: e.target.value as FilterOperator })}
-                  className="rounded border border-gray-200 bg-white px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-700"
+                  className="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                 >
                   {ops.map((op) => (
                     <option key={op.value} value={op.value}>{op.label}</option>
@@ -182,7 +182,7 @@ export function FilterSortBar({ fields, filters, onFiltersChange, sortConfig, on
                     value={rule.value}
                     onChange={(e) => updateFilter(rule.id, { value: e.target.value })}
                     placeholder="valor…"
-                    className="rounded border border-gray-200 bg-white px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-700"
+                    className="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                   />
                 )}
 
@@ -211,7 +211,7 @@ export function FilterSortBar({ fields, filters, onFiltersChange, sortConfig, on
               if (!e.target.value) { onSortChange(null); return; }
               onSortChange({ fieldId: e.target.value, direction: sortConfig?.direction ?? "asc" });
             }}
-            className="rounded border border-gray-200 bg-white px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-700"
+            className="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
           >
             <option value="">— sin orden —</option>
             {fields.map((f) => (
@@ -223,7 +223,7 @@ export function FilterSortBar({ fields, filters, onFiltersChange, sortConfig, on
             <select
               value={sortConfig.direction}
               onChange={(e) => onSortChange({ ...sortConfig, direction: e.target.value as "asc" | "desc" })}
-              className="rounded border border-gray-200 bg-white px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-700"
+              className="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
             >
               <option value="asc">Ascendente ↑</option>
               <option value="desc">Descendente ↓</option>

@@ -68,3 +68,29 @@ html {
 .dark .overflow-y-auto::-webkit-scrollbar-thumb {
   background: #374151;
 }
+
+/* ── BlockNote editor: alinear colores con nuestro tema oscuro ── */
+.dark .bn-container[data-color-scheme=dark] {
+  --bn-colors-editor-background: #111827;
+  --bn-colors-editor-text: #f3f4f6;
+  --bn-colors-menu-background: #1f2937;
+  --bn-colors-menu-text: #f3f4f6;
+  --bn-colors-tooltip-background: #1f2937;
+  --bn-colors-tooltip-text: #f3f4f6;
+  --bn-colors-hovered-background: #374151;
+  --bn-colors-hovered-text: #f3f4f6;
+  --bn-colors-selected-background: #4b5563;
+  --bn-colors-selected-text: #f3f4f6;
+  --bn-colors-disabled-background: #1f2937;
+  --bn-colors-disabled-text: #6b7280;
+  --bn-colors-border: #374151;
+  --bn-colors-side-menu: #6b7280;
+}
+
+/* ── Inputs nativos: texto visible en modo oscuro ── */
+.dark input:not([type=checkbox]):not([type=radio]):not([type=color]),
+.dark select,
+.dark textarea {
+  color: #f3f4f6;
+  color-scheme: dark;
+}

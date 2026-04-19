@@ -74,7 +74,7 @@ export function TableCell({ type, value, options = [], isEditing, onStartEdit, o
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={handleKeyDown}
-        className="h-full w-full border-0 bg-blue-50 px-2 py-1 text-sm outline-none dark:bg-blue-900/20"
+        className="h-full w-full border-0 bg-blue-50 px-2 py-1 text-sm text-gray-900 outline-none dark:bg-blue-900/20 dark:text-gray-100"
       >
         <option value="">— ninguno —</option>
         {options.map((opt) => (
@@ -100,7 +100,7 @@ export function TableCell({ type, value, options = [], isEditing, onStartEdit, o
       onChange={(e) => setDraft(type === "NUMBER" ? Number(e.target.value) : e.target.value)}
       onBlur={commit}
       onKeyDown={handleKeyDown}
-      className="h-full w-full border-0 bg-blue-50 px-2 py-1 text-sm outline-none dark:bg-blue-900/20"
+      className="h-full w-full border-0 bg-blue-50 px-2 py-1 text-sm text-gray-900 outline-none dark:bg-blue-900/20 dark:text-gray-100"
     />
   );
 }
