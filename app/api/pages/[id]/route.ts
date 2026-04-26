@@ -36,9 +36,28 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
 const UpdateSchema = z.object({
   title: z.string().min(1).max(500).optional(),
   content: z.any().optional(),
-  icon: z.string().max(10).optional(),
-  cover: z.string().url().optional(),
+  icon: z.string().max(10).optional().nullable(),
+  cover: z
+    .string()
+    .max(1000)
+    .optional()
+    .nullable()
+    .refine(
+      (value) =>
+        value === undefined ||
+        value === null ||
+        value.startsWith("http://") ||
+        value.startsWith("https://") ||
+        value.startsWith("#") ||
+        value.startsWith("linear-gradient(") ||
+        value.startsWith("radial-gradient("),
+      {
+        message: "cover must be image URL, hex color, or CSS gradient",
+      }
+    ),
   position: z.number().int().min(0).optional(),
+  isFullWidth: z.boolean().optional(),
+  isFavorite: z.boolean().optional(),
 });
 
 export async function PUT(request: NextRequest, { params }: RouteContext) {
@@ -55,6 +74,8 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
         ...(data.icon !== undefined && { icon: data.icon }),
         ...(data.cover !== undefined && { cover: data.cover }),
         ...(data.position !== undefined && { position: data.position }),
+        ...(data.isFullWidth !== undefined && { isFullWidth: data.isFullWidth }),
+        ...(data.isFavorite !== undefined && { isFavorite: data.isFavorite }),
       },
     });
 

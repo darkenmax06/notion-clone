@@ -151,6 +151,42 @@ describe("PUT /api/pages/[id]", () => {
     );
   });
 
+  it("accepts CSS gradient cover values", async () => {
+    (mockPage.update as jest.Mock).mockResolvedValue({ id: PAGE_ID });
+
+    const req = makeReq(`/api/pages/${PAGE_ID}`, {
+      method: "PUT",
+      body: JSON.stringify({ cover: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const res = await PUT(req, makeCtx(PAGE_ID));
+
+    expect(res.status).toBe(200);
+    expect(mockPage.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { cover: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" },
+      })
+    );
+  });
+
+  it("updates isFullWidth and isFavorite flags", async () => {
+    (mockPage.update as jest.Mock).mockResolvedValue({ id: PAGE_ID });
+
+    const req = makeReq(`/api/pages/${PAGE_ID}`, {
+      method: "PUT",
+      body: JSON.stringify({ isFullWidth: true, isFavorite: true }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const res = await PUT(req, makeCtx(PAGE_ID));
+
+    expect(res.status).toBe(200);
+    expect(mockPage.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { isFullWidth: true, isFavorite: true },
+      })
+    );
+  });
+
   it("returns 400 when title is empty string", async () => {
     const req = makeReq(`/api/pages/${PAGE_ID}`, {
       method: "PUT",

@@ -20,6 +20,9 @@ const UpdateDatabaseSchema = z.object({
   icon: z.string().max(10).nullable().optional(),
   viewType: z.nativeEnum(ViewType).optional(),
   kanbanGroupFieldId: z.string().nullable().optional(),
+  galleryImageFieldId: z.string().nullable().optional(),
+  timelineStartFieldId: z.string().nullable().optional(),
+  timelineEndFieldId: z.string().nullable().optional(),
 });
 
 const SelectOptionSchema = z.object({
@@ -76,6 +79,9 @@ export async function updateDatabase(
       ...(data.icon !== undefined && { icon: data.icon }),
       ...(data.viewType !== undefined && { viewType: data.viewType }),
       ...(data.kanbanGroupFieldId !== undefined && { kanbanGroupFieldId: data.kanbanGroupFieldId }),
+      ...(data.galleryImageFieldId !== undefined && { galleryImageFieldId: data.galleryImageFieldId }),
+      ...(data.timelineStartFieldId !== undefined && { timelineStartFieldId: data.timelineStartFieldId }),
+      ...(data.timelineEndFieldId !== undefined && { timelineEndFieldId: data.timelineEndFieldId }),
     },
   });
 

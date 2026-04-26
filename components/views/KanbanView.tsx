@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragEndEvent,
   DragOverlay,
-  DragOverEvent,
   PointerSensor,
   useSensor,
   useSensors,
@@ -18,7 +17,7 @@ import {
 } from "@dnd-kit/sortable";
 import { useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Plus, GripVertical, ChevronDown } from "lucide-react";
+import { Plus, GripVertical, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
 import { FieldType } from "@prisma/client";
 import type { FieldRow, RecordRow } from "./DatabaseView";
 import type { SelectOption } from "./TableCell";
@@ -35,13 +34,20 @@ type Props = {
   onGroupFieldChange: (fieldId: string) => Promise<void>;
   onUpdateRecord: (recordId: string, values: Record<string, unknown>) => Promise<void>;
   onAddRecord: (groupValue: string, groupFieldId: string) => Promise<void>;
+  onUpdateGroupFieldOptions?: (fieldId: string, options: SelectOption[]) => Promise<void>;
 };
 
 type KanbanColumn = {
-  id: string;         // option value (or UNCATEGORIZED_ID)
-  droppableId: string; // "col::" + id — unique droppable key
+  id: string;
+  droppableId: string;
   label: string;
   color: string;
+  records: RecordRow[];
+};
+
+type Subgroup = {
+  key: string;
+  label: string;
   records: RecordRow[];
 };
 
@@ -50,46 +56,112 @@ type KanbanColumn = {
 // ---------------------------------------------------------------------------
 
 const UNCATEGORIZED_ID = "__uncategorized__";
-
-// Prefix that can't collide with cuid record IDs
 const COL_PREFIX = "col::";
+const DEFAULT_COLUMN_COLORS = [
+  "#6366f1",
+  "#ef4444",
+  "#22c55e",
+  "#f59e0b",
+  "#06b6d4",
+  "#8b5cf6",
+  "#ec4899",
+  "#3b82f6",
+];
 
 function getSelectFields(fields: FieldRow[]): FieldRow[] {
-  return fields.filter((f) => f.type === FieldType.SELECT);
+  return fields.filter((field) => field.type === FieldType.SELECT);
 }
 
 function resolveGroupField(fields: FieldRow[], groupFieldId: string | null): FieldRow | undefined {
   if (groupFieldId) {
-    const found = fields.find((f) => f.id === groupFieldId && f.type === FieldType.SELECT);
+    const found = fields.find((field) => field.id === groupFieldId && field.type === FieldType.SELECT);
     if (found) return found;
   }
-  return fields.find((f) => f.type === FieldType.SELECT);
+  return fields.find((field) => field.type === FieldType.SELECT);
 }
 
 function getTitleField(fields: FieldRow[]): FieldRow | undefined {
-  return fields.find((f) => f.type === FieldType.TEXT);
+  return fields.find((field) => field.type === FieldType.TEXT);
+}
+
+function getSubgroupFields(fields: FieldRow[], groupFieldId: string | undefined): FieldRow[] {
+  return fields.filter((field) => field.id !== groupFieldId);
+}
+
+function subgroupLabel(field: FieldRow | null, value: unknown): string {
+  if (!field) return "Sin subgrupo";
+
+  if (field.type === FieldType.CHECKBOX) {
+    return value === true ? "Marcado" : "No marcado";
+  }
+
+  if (field.type === FieldType.DATE) {
+    return String(value ?? "").slice(0, 10) || "Sin fecha";
+  }
+
+  const raw = String(value ?? "").trim();
+  return raw || "Sin valor";
+}
+
+function subgroupKey(field: FieldRow | null, value: unknown): string {
+  if (!field) return "__default__";
+
+  if (field.type === FieldType.CHECKBOX) {
+    return value === true ? "__checked__" : "__unchecked__";
+  }
+
+  if (field.type === FieldType.DATE) {
+    return String(value ?? "").slice(0, 10) || "__empty__";
+  }
+
+  return String(value ?? "").trim() || "__empty__";
+}
+
+function buildSubgroups(records: RecordRow[], field: FieldRow | null): Subgroup[] {
+  if (!field) {
+    return [{ key: "__all__", label: "", records }];
+  }
+
+  const grouped = new Map<string, Subgroup>();
+
+  records.forEach((record) => {
+    const value = record.values[field.id];
+    const key = subgroupKey(field, value);
+
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        key,
+        label: subgroupLabel(field, value),
+        records: [],
+      });
+    }
+
+    grouped.get(key)!.records.push(record);
+  });
+
+  return Array.from(grouped.values());
 }
 
 function buildColumns(records: RecordRow[], groupField: FieldRow): KanbanColumn[] {
   const options: SelectOption[] = groupField.options ?? [];
 
-  const columns: KanbanColumn[] = options.map((opt) => ({
-    id: opt.value,
-    droppableId: `${COL_PREFIX}${opt.value}`,
-    label: opt.value,
-    color: opt.color,
-    records: records.filter((r) => r.values[groupField.id] === opt.value),
+  const columns: KanbanColumn[] = options.map((option) => ({
+    id: option.value,
+    droppableId: `${COL_PREFIX}${option.value}`,
+    label: option.value,
+    color: option.color,
+    records: records.filter((record) => record.values[groupField.id] === option.value),
   }));
 
   const uncategorized = records.filter(
-    (r) => !options.some((o) => o.value === r.values[groupField.id])
+    (record) => !options.some((option) => option.value === record.values[groupField.id])
   );
 
   if (uncategorized.length > 0) {
     columns.push({
       id: UNCATEGORIZED_ID,
       droppableId: `${COL_PREFIX}${UNCATEGORIZED_ID}`,
-      label: "Sin categoría",
+      label: "Sin categoria",
       color: "#94a3b8",
       records: uncategorized,
     });
@@ -118,7 +190,7 @@ function GroupFieldSelector({
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen((value) => !value)}
         data-testid="kanban-group-selector"
         className="flex items-center gap-1.5 rounded border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
       >
@@ -141,7 +213,7 @@ function GroupFieldSelector({
                 )}
               >
                 {field.name}
-                {field.id === activeField.id && <span className="ml-auto text-xs text-indigo-400">✓</span>}
+                {field.id === activeField.id && <span className="ml-auto text-xs text-indigo-400">OK</span>}
               </button>
             ))}
           </div>
@@ -172,10 +244,10 @@ function KanbanCard({
   const style = { transform: CSS.Transform.toString(transform), transition };
 
   const title = titleField
-    ? String(record.values[titleField.id] ?? "Sin título")
-    : "Sin título";
+    ? String(record.values[titleField.id] ?? "Sin titulo")
+    : "Sin titulo";
 
-  const dateField = fields.find((f) => f.type === FieldType.DATE);
+  const dateField = fields.find((field) => field.type === FieldType.DATE);
   const dateValue = dateField ? record.values[dateField.id] : undefined;
 
   return (
@@ -197,7 +269,7 @@ function KanbanCard({
         >
           <GripVertical size={14} />
         </button>
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-gray-800 dark:text-gray-100">
             {title}
           </p>
@@ -213,7 +285,7 @@ function KanbanCard({
 }
 
 // ---------------------------------------------------------------------------
-// Kanban Column — droppable + sortable context
+// Kanban Column
 // ---------------------------------------------------------------------------
 
 function KanbanColumnComp({
@@ -222,73 +294,150 @@ function KanbanColumnComp({
   fields,
   activeId,
   onAddRecord,
+  isCollapsed,
+  onToggleCollapsed,
+  subgroupField,
+  wipLimit,
+  onWipLimitChange,
 }: {
   column: KanbanColumn;
   titleField: FieldRow | undefined;
   fields: FieldRow[];
   activeId: string | null;
   onAddRecord: () => void;
+  isCollapsed: boolean;
+  onToggleCollapsed: () => void;
+  subgroupField: FieldRow | null;
+  wipLimit: number | undefined;
+  onWipLimitChange: (value: number | undefined) => void;
 }) {
-  // Register the whole column as a drop target so empty columns accept drops
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: column.droppableId });
-  const cardIds = useMemo(() => column.records.map((r) => r.id), [column.records]);
+  const cardIds = useMemo(() => column.records.map((record) => record.id), [column.records]);
+  const subgroups = useMemo(() => buildSubgroups(column.records, subgroupField), [column.records, subgroupField]);
+
+  const hasWipLimit = typeof wipLimit === "number" && wipLimit > 0;
+  const isOverWip = hasWipLimit && column.records.length > wipLimit;
 
   return (
     <div
       ref={setDropRef}
       className={cn(
-        "flex h-full min-h-[200px] w-72 flex-shrink-0 flex-col rounded-lg transition-colors",
+        "flex h-full min-h-[220px] flex-shrink-0 flex-col rounded-lg transition-all",
+        isCollapsed ? "w-24" : "w-80",
         "bg-gray-50 dark:bg-gray-900/50",
-        isOver && "bg-indigo-50 ring-2 ring-inset ring-indigo-300 dark:bg-indigo-900/20 dark:ring-indigo-600"
+        isOver && "bg-indigo-50 ring-2 ring-inset ring-indigo-300 dark:bg-indigo-900/20 dark:ring-indigo-600",
+        isOverWip && "ring-2 ring-amber-300 dark:ring-amber-600"
       )}
     >
-      {/* Column header */}
-      <div className="flex items-center justify-between px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: column.color }} />
-          <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-            {column.label}
-          </span>
-          <span className="rounded-full bg-gray-200 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-gray-700 dark:text-gray-400">
-            {column.records.length}
-          </span>
-        </div>
-        <button
-          onClick={onAddRecord}
-          className="rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700"
-          title={`Añadir a ${column.label}`}
+      <div className="flex items-center gap-2 px-3 py-2.5">
+        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: column.color }} />
+        <span className={cn("text-sm font-semibold text-gray-700 dark:text-gray-300", isCollapsed && "truncate")}>{column.label}</span>
+        <span
+          className={cn(
+            "rounded-full bg-gray-200 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-gray-700 dark:text-gray-400",
+            isOverWip && "bg-amber-200 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+          )}
         >
-          <Plus size={14} />
+          {column.records.length}
+        </span>
+        <button
+          onClick={onToggleCollapsed}
+          className="ml-auto rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700"
+          title={isCollapsed ? "Expandir columna" : "Colapsar columna"}
+        >
+          {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
         </button>
       </div>
 
-      {/* Cards */}
-      <div className="flex-1 space-y-2 overflow-y-auto px-3 pb-3">
-        <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
-          {column.records.map((record) => (
-            <KanbanCard
-              key={record.id}
-              record={record}
-              titleField={titleField}
-              fields={fields}
-              isBeingDragged={activeId === record.id}
-            />
-          ))}
-        </SortableContext>
+      {!isCollapsed && (
+        <>
+          <div className="flex items-center gap-2 px-3 pb-2">
+            <label className="text-[11px] text-gray-400">
+              WIP:
+              <input
+                type="number"
+                min={0}
+                value={typeof wipLimit === "number" ? String(wipLimit) : ""}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (!raw) {
+                    onWipLimitChange(undefined);
+                    return;
+                  }
+                  const parsed = Number(raw);
+                  onWipLimitChange(Number.isNaN(parsed) ? undefined : parsed);
+                }}
+                className="ml-1 w-16 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+              />
+            </label>
 
-        {column.records.length === 0 && (
-          <div className={cn(
-            "flex h-16 items-center justify-center rounded border-2 border-dashed",
-            isOver
-              ? "border-indigo-300 dark:border-indigo-600"
-              : "border-gray-200 dark:border-gray-700"
-          )}>
-            <p className="text-xs text-gray-400">
-              {isOver ? "Soltar aquí" : "Sin registros"}
-            </p>
+            <button
+              onClick={onAddRecord}
+              className="ml-auto rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700"
+              title={`Anadir a ${column.label}`}
+            >
+              <Plus size={14} />
+            </button>
           </div>
-        )}
-      </div>
+
+          {isOverWip && (
+            <div className="mx-3 mb-2 flex items-center gap-1 rounded bg-amber-50 px-2 py-1 text-[11px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+              <AlertTriangle size={12} />
+              Limite WIP excedido ({wipLimit})
+            </div>
+          )}
+
+          <div className="flex-1 space-y-2 overflow-y-auto px-3 pb-3">
+            <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
+              {subgroups.map((subgroup) => (
+                <div key={`${column.id}-${subgroup.key}`} className="space-y-1.5">
+                  {subgroupField && (
+                    <div className="flex items-center justify-between px-1 text-[11px] text-gray-400">
+                      <span className="truncate">{subgroup.label}</span>
+                      <span>{subgroup.records.length}</span>
+                    </div>
+                  )}
+
+                  {subgroup.records.map((record) => (
+                    <KanbanCard
+                      key={record.id}
+                      record={record}
+                      titleField={titleField}
+                      fields={fields}
+                      isBeingDragged={activeId === record.id}
+                    />
+                  ))}
+                </div>
+              ))}
+            </SortableContext>
+
+            {column.records.length === 0 && (
+              <div
+                className={cn(
+                  "flex h-16 items-center justify-center rounded border-2 border-dashed",
+                  isOver ? "border-indigo-300 dark:border-indigo-600" : "border-gray-200 dark:border-gray-700"
+                )}
+              >
+                <p className="text-xs text-gray-400">
+                  {isOver ? "Soltar aqui" : "Sin registros"}
+                </p>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {isCollapsed && (
+        <div className="px-3 pb-2">
+          <button
+            onClick={onAddRecord}
+            className="flex w-full items-center justify-center rounded border border-dashed border-gray-300 px-1 py-1 text-gray-400 hover:border-gray-400 hover:text-gray-600 dark:border-gray-700 dark:hover:border-gray-500"
+            title={`Anadir a ${column.label}`}
+          >
+            <Plus size={12} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -304,14 +453,29 @@ export default function KanbanView({
   onGroupFieldChange,
   onUpdateRecord,
   onAddRecord,
+  onUpdateGroupFieldOptions,
 }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
-  // Optimistic local copy — updates immediately on drop without waiting for server
   const [localRecords, setLocalRecords] = useState<RecordRow[]>(records);
+  const [subgroupFieldId, setSubgroupFieldId] = useState<string | null>(null);
+  const [collapsedColumns, setCollapsedColumns] = useState<Record<string, boolean>>({});
+  const [wipLimitsByColumn, setWipLimitsByColumn] = useState<Record<string, number | undefined>>({});
+  const [showAddColumnForm, setShowAddColumnForm] = useState(false);
+  const [newColumnName, setNewColumnName] = useState("");
+  const [newColumnColor, setNewColumnColor] = useState(DEFAULT_COLUMN_COLORS[0]);
+
+  useEffect(() => {
+    setLocalRecords(records);
+  }, [records]);
 
   const selectFields = useMemo(() => getSelectFields(fields), [fields]);
-  const groupField   = useMemo(() => resolveGroupField(fields, groupFieldId), [fields, groupFieldId]);
-  const titleField   = useMemo(() => getTitleField(fields), [fields]);
+  const groupField = useMemo(() => resolveGroupField(fields, groupFieldId), [fields, groupFieldId]);
+  const titleField = useMemo(() => getTitleField(fields), [fields]);
+  const subgroupFields = useMemo(() => getSubgroupFields(fields, groupField?.id), [fields, groupField?.id]);
+  const subgroupField = useMemo(
+    () => subgroupFields.find((field) => field.id === subgroupFieldId) ?? null,
+    [subgroupFields, subgroupFieldId]
+  );
 
   const columns = useMemo(
     () => (groupField ? buildColumns(localRecords, groupField) : []),
@@ -323,25 +487,39 @@ export default function KanbanView({
   );
 
   const activeRecord = useMemo(
-    () => localRecords.find((r) => r.id === activeId) ?? null,
+    () => localRecords.find((record) => record.id === activeId) ?? null,
     [localRecords, activeId]
   );
+
+  useEffect(() => {
+    setCollapsedColumns((prev) => {
+      const next: Record<string, boolean> = {};
+      columns.forEach((column) => {
+        if (prev[column.id]) next[column.id] = true;
+      });
+      return next;
+    });
+
+    setWipLimitsByColumn((prev) => {
+      const next: Record<string, number | undefined> = {};
+      columns.forEach((column) => {
+        next[column.id] = prev[column.id];
+      });
+      return next;
+    });
+  }, [columns]);
 
   function handleDragStart(event: { active: { id: string | number } }) {
     setActiveId(String(event.active.id));
   }
 
-  // Resolve target column from a drop "over" ID.
-  // over.id can be:
-  //  - "col::<columnId>"  → dragged onto the column droppable area
-  //  - "<recordId>"       → dragged onto another card inside a column
   function resolveTargetColumn(overId: string): KanbanColumn | undefined {
     if (overId.startsWith(COL_PREFIX)) {
-      const colId = overId.slice(COL_PREFIX.length);
-      return columns.find((col) => col.id === colId);
+      const columnId = overId.slice(COL_PREFIX.length);
+      return columns.find((column) => column.id === columnId);
     }
-    // dragged onto a card — find which column owns that card
-    return columns.find((col) => col.records.some((r) => r.id === overId));
+
+    return columns.find((column) => column.records.some((record) => record.id === overId));
   }
 
   async function handleDragEnd(event: DragEndEvent) {
@@ -350,39 +528,54 @@ export default function KanbanView({
     if (!over || !groupField) return;
 
     const draggedId = String(active.id);
-    const overId    = String(over.id);
+    const overId = String(over.id);
     if (draggedId === overId) return;
 
     const targetColumn = resolveTargetColumn(overId);
     if (!targetColumn) return;
 
-    // Find source column — skip update if same column
-    const sourceColumn = columns.find((col) => col.records.some((r) => r.id === draggedId));
+    const sourceColumn = columns.find((column) => column.records.some((record) => record.id === draggedId));
     if (sourceColumn?.id === targetColumn.id) return;
 
     const newGroupValue = targetColumn.id === UNCATEGORIZED_ID ? "" : targetColumn.id;
 
-    // Optimistic UI update
     setLocalRecords((prev) =>
-      prev.map((r) =>
-        r.id === draggedId
-          ? { ...r, values: { ...r.values, [groupField.id]: newGroupValue } }
-          : r
+      prev.map((record) =>
+        record.id === draggedId
+          ? { ...record, values: { ...record.values, [groupField.id]: newGroupValue } }
+          : record
       )
     );
 
-    const record = localRecords.find((r) => r.id === draggedId);
+    const record = localRecords.find((item) => item.id === draggedId);
     if (record) {
       await onUpdateRecord(draggedId, { ...record.values, [groupField.id]: newGroupValue });
     }
+  }
+
+  async function handleCreateColumn() {
+    if (!groupField || !onUpdateGroupFieldOptions) return;
+
+    const trimmedName = newColumnName.trim();
+    if (!trimmedName) return;
+
+    const options = groupField.options ?? [];
+    const exists = options.some((option) => option.value.toLowerCase() === trimmedName.toLowerCase());
+    if (exists) return;
+
+    const nextOptions = [...options, { value: trimmedName, color: newColumnColor }];
+    await onUpdateGroupFieldOptions(groupField.id, nextOptions);
+
+    setNewColumnName("");
+    setNewColumnColor(DEFAULT_COLUMN_COLORS[nextOptions.length % DEFAULT_COLUMN_COLORS.length]);
+    setShowAddColumnForm(false);
   }
 
   if (selectFields.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center p-12 text-gray-400">
         <p className="text-sm">
-          La vista Kanban requiere al menos un campo de tipo{" "}
-          <strong>Select</strong>. Añade uno en la vista Tabla.
+          La vista Kanban requiere al menos un campo de tipo <strong>Select</strong>. Anade uno en la vista Tabla.
         </p>
       </div>
     );
@@ -390,8 +583,7 @@ export default function KanbanView({
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      {/* Toolbar */}
-      <div className="flex items-center gap-3 border-b border-gray-100 px-6 py-2 dark:border-gray-800">
+      <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-6 py-2 dark:border-gray-800">
         {groupField && (
           <GroupFieldSelector
             selectFields={selectFields}
@@ -399,12 +591,71 @@ export default function KanbanView({
             onChange={onGroupFieldChange}
           />
         )}
+
+        {subgroupFields.length > 0 && (
+          <label className="text-xs text-gray-500">
+            Subgrupo:
+            <select
+              value={subgroupFieldId ?? ""}
+              onChange={(e) => setSubgroupFieldId(e.target.value || null)}
+              className="ml-1 rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+            >
+              <option value="">Sin subgrupo</option>
+              {subgroupFields.map((field) => (
+                <option key={field.id} value={field.id}>{field.name}</option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {groupField && onUpdateGroupFieldOptions && (
+          <div className="relative">
+            <button
+              onClick={() => setShowAddColumnForm((value) => !value)}
+              className="flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+              data-testid="kanban-add-column-toggle"
+            >
+              <Plus size={12} /> Nueva columna
+            </button>
+
+            {showAddColumnForm && (
+              <div className="absolute left-0 top-full z-20 mt-1 w-64 rounded-lg border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                <p className="mb-2 text-xs font-medium text-gray-500">Crear opcion en {groupField.name}</p>
+                <input
+                  value={newColumnName}
+                  onChange={(e) => setNewColumnName(e.target.value)}
+                  placeholder="Nombre de columna"
+                  className="mb-2 w-full rounded border border-gray-200 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-indigo-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                  data-testid="kanban-new-column-name"
+                />
+
+                <div className="mb-2 flex items-center gap-2 text-xs text-gray-500">
+                  Color:
+                  <input
+                    type="color"
+                    value={newColumnColor}
+                    onChange={(e) => setNewColumnColor(e.target.value)}
+                    className="h-6 w-8 rounded border border-gray-200 dark:border-gray-700"
+                  />
+                </div>
+
+                <button
+                  onClick={() => { void handleCreateColumn(); }}
+                  className="w-full rounded bg-indigo-600 px-2 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+                  data-testid="kanban-create-column"
+                >
+                  Guardar columna
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         <p className="ml-auto text-xs text-gray-400">
-          Arrastra una tarjeta entre columnas para cambiar <strong>{groupField?.name}</strong>
+          Arrastra tarjetas entre columnas para cambiar <strong>{groupField?.name}</strong>
         </p>
       </div>
 
-      {/* Board */}
       <div className="flex gap-4 overflow-x-auto p-6">
         <DndContext
           sensors={sensors}
@@ -424,6 +675,21 @@ export default function KanbanView({
                   column.id === UNCATEGORIZED_ID ? "" : column.id,
                   groupField!.id
                 )
+              }
+              isCollapsed={Boolean(collapsedColumns[column.id])}
+              onToggleCollapsed={() =>
+                setCollapsedColumns((prev) => ({
+                  ...prev,
+                  [column.id]: !prev[column.id],
+                }))
+              }
+              subgroupField={subgroupField}
+              wipLimit={wipLimitsByColumn[column.id]}
+              onWipLimitChange={(value) =>
+                setWipLimitsByColumn((prev) => ({
+                  ...prev,
+                  [column.id]: value,
+                }))
               }
             />
           ))}

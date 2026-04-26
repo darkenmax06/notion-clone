@@ -23,7 +23,7 @@ const mockDb = prisma.database as jest.Mocked<typeof prisma.database>;
 
 const DB_ID = "ctest00000000000000000099";
 
-describe("updateDatabase — viewType support", () => {
+describe("updateDatabase - viewType support", () => {
   beforeEach(() => jest.clearAllMocks());
 
   it("updates viewType to KANBAN", async () => {
@@ -61,6 +61,57 @@ describe("updateDatabase — viewType support", () => {
     );
   });
 
+  it("updates viewType to GALLERY", async () => {
+    (mockDb.update as jest.Mock).mockResolvedValue({
+      id: DB_ID,
+      title: "Test DB",
+      viewType: "GALLERY",
+    });
+
+    const result = await updateDatabase(DB_ID, { viewType: "GALLERY" });
+
+    expect(result.success).toBe(true);
+    expect(mockDb.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ viewType: "GALLERY" }),
+      })
+    );
+  });
+
+  it("updates viewType to LIST", async () => {
+    (mockDb.update as jest.Mock).mockResolvedValue({
+      id: DB_ID,
+      title: "Test DB",
+      viewType: "LIST",
+    });
+
+    const result = await updateDatabase(DB_ID, { viewType: "LIST" });
+
+    expect(result.success).toBe(true);
+    expect(mockDb.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ viewType: "LIST" }),
+      })
+    );
+  });
+
+  it("updates viewType to TIMELINE", async () => {
+    (mockDb.update as jest.Mock).mockResolvedValue({
+      id: DB_ID,
+      title: "Test DB",
+      viewType: "TIMELINE",
+    });
+
+    const result = await updateDatabase(DB_ID, { viewType: "TIMELINE" });
+
+    expect(result.success).toBe(true);
+    expect(mockDb.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ viewType: "TIMELINE" }),
+      })
+    );
+  });
+
   it("updates viewType back to TABLE", async () => {
     (mockDb.update as jest.Mock).mockResolvedValue({
       id: DB_ID,
@@ -81,10 +132,10 @@ describe("updateDatabase — viewType support", () => {
   it("does not include viewType in data when not provided", async () => {
     (mockDb.update as jest.Mock).mockResolvedValue({
       id: DB_ID,
-      title: "Nuevo título",
+      title: "Nuevo titulo",
     });
 
-    await updateDatabase(DB_ID, { title: "Nuevo título" });
+    await updateDatabase(DB_ID, { title: "Nuevo titulo" });
 
     const callArg = (mockDb.update as jest.Mock).mock.calls[0][0];
     expect(callArg.data).not.toHaveProperty("viewType");
@@ -120,7 +171,7 @@ describe("updateDatabase — viewType support", () => {
   });
 });
 
-describe("updateDatabase — kanbanGroupFieldId support", () => {
+describe("updateDatabase - kanbanGroupFieldId support", () => {
   beforeEach(() => jest.clearAllMocks());
 
   it("saves a kanbanGroupFieldId", async () => {
@@ -159,7 +210,7 @@ describe("updateDatabase — kanbanGroupFieldId support", () => {
   it("does not include kanbanGroupFieldId when not provided", async () => {
     (mockDb.update as jest.Mock).mockResolvedValue({ id: DB_ID });
 
-    await updateDatabase(DB_ID, { title: "Solo título" });
+    await updateDatabase(DB_ID, { title: "Solo titulo" });
 
     const callArg = (mockDb.update as jest.Mock).mock.calls[0][0];
     expect(callArg.data).not.toHaveProperty("kanbanGroupFieldId");
@@ -187,5 +238,78 @@ describe("updateDatabase — kanbanGroupFieldId support", () => {
         }),
       })
     );
+  });
+});
+
+describe("updateDatabase - gallery/timeline config support", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("saves galleryImageFieldId", async () => {
+    const FIELD_ID = "ctest00000000000000000111";
+    (mockDb.update as jest.Mock).mockResolvedValue({
+      id: DB_ID,
+      galleryImageFieldId: FIELD_ID,
+    });
+
+    const result = await updateDatabase(DB_ID, { galleryImageFieldId: FIELD_ID });
+
+    expect(result.success).toBe(true);
+    expect(mockDb.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ galleryImageFieldId: FIELD_ID }),
+      })
+    );
+  });
+
+  it("can clear galleryImageFieldId", async () => {
+    (mockDb.update as jest.Mock).mockResolvedValue({
+      id: DB_ID,
+      galleryImageFieldId: null,
+    });
+
+    const result = await updateDatabase(DB_ID, { galleryImageFieldId: null });
+
+    expect(result.success).toBe(true);
+    expect(mockDb.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ galleryImageFieldId: null }),
+      })
+    );
+  });
+
+  it("saves timeline start/end fields together", async () => {
+    const START_ID = "ctest00000000000000000221";
+    const END_ID = "ctest00000000000000000222";
+    (mockDb.update as jest.Mock).mockResolvedValue({
+      id: DB_ID,
+      timelineStartFieldId: START_ID,
+      timelineEndFieldId: END_ID,
+    });
+
+    const result = await updateDatabase(DB_ID, {
+      timelineStartFieldId: START_ID,
+      timelineEndFieldId: END_ID,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockDb.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          timelineStartFieldId: START_ID,
+          timelineEndFieldId: END_ID,
+        }),
+      })
+    );
+  });
+
+  it("does not include gallery/timeline fields when omitted", async () => {
+    (mockDb.update as jest.Mock).mockResolvedValue({ id: DB_ID });
+
+    await updateDatabase(DB_ID, { title: "Solo titulo" });
+
+    const callArg = (mockDb.update as jest.Mock).mock.calls[0][0];
+    expect(callArg.data).not.toHaveProperty("galleryImageFieldId");
+    expect(callArg.data).not.toHaveProperty("timelineStartFieldId");
+    expect(callArg.data).not.toHaveProperty("timelineEndFieldId");
   });
 });

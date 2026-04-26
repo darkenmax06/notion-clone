@@ -14,8 +14,16 @@ type Props = {
   pageId: string;
   initialTitle?: string;
   initialContent?: Block[];
+  isFullWidth?: boolean;
 };
 
-export default function BlockEditorClient({ pageId, initialTitle, initialContent }: Props) {
-  return <BlockEditor pageId={pageId} initialTitle={initialTitle} initialContent={initialContent} />;
+export default function BlockEditorClient({ pageId, initialTitle, initialContent, isFullWidth }: Props) {
+  return (
+    <BlockEditor
+      pageId={pageId}
+      initialTitle={initialTitle}
+      initialContent={initialContent}
+      isFullWidth={isFullWidth}
+    />
+  );
 }

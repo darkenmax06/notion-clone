@@ -8,21 +8,30 @@ import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
 import type { Block } from "@blocknote/core";
-import { updatePage } from "@/lib/actions/pages";
+import { savePageVersion, updatePage } from "@/lib/actions/pages";
 
 type Props = {
   pageId: string;
   initialTitle?: string;
   initialContent?: Block[] | null;
+  isFullWidth?: boolean;
   onTitleChange?: (title: string) => void;
 };
 
 // Tiempo de espera (ms) antes de guardar tras el último cambio
 const AUTOSAVE_DELAY = 1000;
+const VERSION_SAVE_INTERVAL = 30_000;
 
-export default function BlockEditor({ pageId, initialTitle, initialContent, onTitleChange }: Props) {
+export default function BlockEditor({
+  pageId,
+  initialTitle,
+  initialContent,
+  isFullWidth = false,
+  onTitleChange,
+}: Props) {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRef = useRef<string>("");
+  const lastVersionSavedAtRef = useRef<number>(0);
   // true cuando el usuario ya puso un título propio (distinto del default)
   const titleIsCustomRef = useRef(!!initialTitle && initialTitle !== "Sin título");
 
@@ -68,6 +77,7 @@ export default function BlockEditor({ pageId, initialTitle, initialContent, onTi
             : "";
 
         const shouldUpdateTitle = titleText && !titleIsCustomRef.current;
+        const pageTitle = titleText || initialTitle || "Sin título";
 
         await updatePage({
           id: pageId,
@@ -78,9 +88,19 @@ export default function BlockEditor({ pageId, initialTitle, initialContent, onTi
         if (shouldUpdateTitle && onTitleChange) {
           onTitleChange(titleText);
         }
+
+        const now = Date.now();
+        if (now - lastVersionSavedAtRef.current >= VERSION_SAVE_INTERVAL) {
+          lastVersionSavedAtRef.current = now;
+          await savePageVersion({
+            pageId,
+            title: pageTitle,
+            content: blocks,
+          });
+        }
       }, AUTOSAVE_DELAY);
     },
-    [pageId, onTitleChange]
+    [pageId, onTitleChange, initialTitle]
   );
 
   // Limpiar timer al desmontar
@@ -91,7 +111,7 @@ export default function BlockEditor({ pageId, initialTitle, initialContent, onTi
   }, []);
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8">
+    <div className={`mx-auto w-full py-8 ${isFullWidth ? "max-w-full px-16" : "max-w-3xl px-4"}`}>
       <BlockNoteView
         editor={editor}
         onChange={() => scheduleSave(editor.document)}

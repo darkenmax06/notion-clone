@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { ViewType } from "@prisma/client";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -29,6 +30,11 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
 const UpdateSchema = z.object({
   title: z.string().min(1).max(500).optional(),
   icon: z.string().max(10).nullable().optional(),
+  viewType: z.nativeEnum(ViewType).optional(),
+  kanbanGroupFieldId: z.string().nullable().optional(),
+  galleryImageFieldId: z.string().nullable().optional(),
+  timelineStartFieldId: z.string().nullable().optional(),
+  timelineEndFieldId: z.string().nullable().optional(),
 });
 
 export async function PUT(request: NextRequest, { params }: RouteContext) {
@@ -45,6 +51,11 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       data: {
         ...(data.title !== undefined && { title: data.title }),
         ...(data.icon !== undefined && { icon: data.icon }),
+        ...(data.viewType !== undefined && { viewType: data.viewType }),
+        ...(data.kanbanGroupFieldId !== undefined && { kanbanGroupFieldId: data.kanbanGroupFieldId }),
+        ...(data.galleryImageFieldId !== undefined && { galleryImageFieldId: data.galleryImageFieldId }),
+        ...(data.timelineStartFieldId !== undefined && { timelineStartFieldId: data.timelineStartFieldId }),
+        ...(data.timelineEndFieldId !== undefined && { timelineEndFieldId: data.timelineEndFieldId }),
       },
     });
 

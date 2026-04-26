@@ -1,18 +1,52 @@
 ok, analiza los documentos de la carpeta: C:\Users\ramse\Documents\Proyectos Ramses\ramtion\docs
 Analiza el contexto del desarrollo de la app y en base a eso crea lo que se indica a continuacion (siguiendo los patrones de diseño y las instrucciones espesificadas en los documentos de la carpeta:
 
-Fase 3 — Base de datos & Tablas (Días 7–11)
-Modelo: Database → Fields → Records (JSONB flexible)
-Server Actions para mutations
-Vista tabla con columnas editables
-Tipos: Text, Number, Date, Select, Checkbox
-Filtros, ordenamiento, inline editing
-Detail view por registro
+Fase 6 — Core UI (paridad con Notion) 🔲
+Objetivo: cubrir las features visibles más icónicas de Notion que un usuario nuevo espera encontrar.
+
+6.1 Papelera (Trash)
+Campo isDeleted ya existe en Page y Record
+Añadir sección "Papelera" en el sidebar (icono Trash)
+Página /trash que lista páginas eliminadas con opciones Restaurar / Eliminar permanente
+Server Actions: restorePage(id), permanentlyDeletePage(id)
+Soft-delete encadenado: eliminar página padre marca hijos como isDeleted
+Archivos: app/(workspace)/trash/page.tsx, lib/actions/pages.ts (2 nuevas actions)
+6.2 Portadas de página (Cover)
+Campo cover ya existe en Page (string URL)
+Botón "Añadir portada" en PageTitleEditor cuando no hay cover
+Picker: colores sólidos predefinidos (10 opciones) + input de URL de imagen
+Soporte para gradientes CSS como valor de cover (linear-gradient(...))
+Botón "Cambiar" / "Eliminar" al hacer hover sobre la portada
+Archivos: components/editor/PageTitleEditor.tsx, lib/actions/pages.ts
+6.3 Ancho completo por página (Full Width)
+Campo nuevo isFullWidth boolean @default(false) en modelo Page
+Toggle en el menú de opciones de la página (icono ↔)
+Cuando activo: max-w-3xl → max-w-full px-16 en el wrapper del editor
+Persistido por Server Action updatePage({ isFullWidth })
+Archivos: prisma/schema.prisma, app/(workspace)/page/[id]/page.tsx
+6.4 Favoritos / Páginas fijadas
+Campo nuevo isFavorite boolean @default(false) en modelo Page
+Botón estrella (⭐) en la barra de herramientas de la página
+Sección "Favoritos" en el sidebar encima de "Páginas" (igual que Notion)
+Server Action toggleFavorite(id)
+Archivos: prisma/schema.prisma, components/sidebar/SidebarServer.tsx, components/sidebar/SidebarClient.tsx
+6.5 Historial de versiones
+Modelo nuevo PageVersion { id, pageId, content Json, title String, createdAt } en Prisma
+Guardar snapshot en cada autosave (o cada N segundos si cambió)
+Panel lateral "Historial" accesible desde el menú de página
+Restaurar versión → crea nueva versión con el contenido actual antes de restaurar
+Archivos: prisma/schema.prisma, lib/actions/pages.ts, components/editor/VersionHistoryPanel.tsx
+6.6 Templates de página
+Modelo Template { id, title, icon, content Json, isSystem boolean } o reutilizar Page con flag
+Galería de templates al crear página nueva (modal)
+Templates del sistema: Meeting Notes, Weekly Review, Project Brief, Bug Report
+Opción "Guardar como template" desde cualquier página
+Archivos: app/(workspace)/templates/page.tsx, components/ui/TemplateGallery.tsx
 
 Luego de eso. realiza test unitarios y de integracion.
 Comprueba que todo funcione y que esta nueva implementacion no afecte a alguna funcionalidad previa.
 Actualiza la respectiva documentacion de la carpeta Docs
-Habilita un servidor de prueba para una revision humana en docker (con datos de prueba)
+Habilita un servidor de prueba para una revision humana en docker, si este ya existe haz la build de las imagenes otra vez con la nueva data (con datos de prueba)
 
 Y espera la confirmacion humana de si se hace commit y push o no.
 

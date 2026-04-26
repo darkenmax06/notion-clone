@@ -1,14 +1,17 @@
 "use client";
 
-import { Table2, LayoutGrid, Calendar } from "lucide-react";
+import { Table2, LayoutGrid, Calendar, Image as ImageIcon, List, GanttChartSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type ViewType = "TABLE" | "KANBAN" | "CALENDAR";
+export type ViewType = "TABLE" | "KANBAN" | "CALENDAR" | "GALLERY" | "LIST" | "TIMELINE";
 
 const VIEWS: { type: ViewType; label: string; Icon: React.ComponentType<{ size?: number }> }[] = [
   { type: "TABLE", label: "Tabla", Icon: Table2 },
   { type: "KANBAN", label: "Kanban", Icon: LayoutGrid },
   { type: "CALENDAR", label: "Calendario", Icon: Calendar },
+  { type: "GALLERY", label: "Galeria", Icon: ImageIcon },
+  { type: "LIST", label: "Lista", Icon: List },
+  { type: "TIMELINE", label: "Timeline", Icon: GanttChartSquare },
 ];
 
 type Props = {

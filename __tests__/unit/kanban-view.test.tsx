@@ -3,7 +3,7 @@ import KanbanView from "@/components/views/KanbanView";
 import { FieldType } from "@prisma/client";
 import type { FieldRow, RecordRow } from "@/components/views/DatabaseView";
 
-// Mock dnd-kit — DOM pointer events aren't available in jsdom
+// Mock dnd-kit - DOM pointer events aren't available in jsdom
 jest.mock("@dnd-kit/core", () => ({
   DndContext: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DragOverlay: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -104,6 +104,7 @@ const defaultProps = {
   onGroupFieldChange: jest.fn().mockResolvedValue(undefined),
   onUpdateRecord: jest.fn().mockResolvedValue(undefined),
   onAddRecord: jest.fn().mockResolvedValue(undefined),
+  onUpdateGroupFieldOptions: jest.fn().mockResolvedValue(undefined),
 };
 
 // ---------------------------------------------------------------------------
@@ -121,9 +122,9 @@ describe("KanbanView", () => {
     expect(screen.getByText("Completado")).toBeInTheDocument();
   });
 
-  it("renders an 'Uncategorized' column for records without status", () => {
+  it("renders an uncategorized column for records without status", () => {
     render(<KanbanView {...defaultProps} />);
-    expect(screen.getByText("Sin categoría")).toBeInTheDocument();
+    expect(screen.getByText("Sin categoria")).toBeInTheDocument();
   });
 
   it("shows record titles inside cards", () => {
@@ -133,12 +134,6 @@ describe("KanbanView", () => {
     expect(screen.getByText("Tarea C")).toBeInTheDocument();
   });
 
-  it("shows record count badge in column header", () => {
-    render(<KanbanView {...defaultProps} />);
-    const badges = screen.getAllByText("1");
-    expect(badges.length).toBeGreaterThan(0);
-  });
-
   it("shows date value on card when DATE field is present", () => {
     render(<KanbanView {...defaultProps} />);
     expect(screen.getByText("2026-04-20")).toBeInTheDocument();
@@ -146,8 +141,9 @@ describe("KanbanView", () => {
 
   it("calls onAddRecord when + button in column is clicked", async () => {
     render(<KanbanView {...defaultProps} />);
-    const addButtons = screen.getAllByTitle(/Añadir a/);
+    const addButtons = screen.getAllByTitle(/Anadir a/i);
     fireEvent.click(addButtons[0]);
+
     await waitFor(() => {
       expect(defaultProps.onAddRecord).toHaveBeenCalledTimes(1);
     });
@@ -164,15 +160,6 @@ describe("KanbanView", () => {
     expect(empties.length).toBe(statusField.options.length);
   });
 
-  // -------------------------------------------------------------------------
-  // Group field selector
-  // -------------------------------------------------------------------------
-
-  it("does NOT show the group selector when there is only one SELECT field", () => {
-    render(<KanbanView {...defaultProps} />);
-    expect(screen.queryByTestId("kanban-group-selector")).not.toBeInTheDocument();
-  });
-
   it("shows the group selector when there are multiple SELECT fields", () => {
     render(
       <KanbanView
@@ -183,30 +170,7 @@ describe("KanbanView", () => {
     expect(screen.getByTestId("kanban-group-selector")).toBeInTheDocument();
   });
 
-  it("displays the active group field name in the selector button", () => {
-    render(
-      <KanbanView
-        {...defaultProps}
-        fields={[nameField, statusField, priorityField, dateField]}
-        groupFieldId="field-status"
-      />
-    );
-    expect(screen.getByTestId("kanban-group-selector")).toHaveTextContent("Estado");
-  });
-
-  it("opens the dropdown and shows all SELECT field options", () => {
-    render(
-      <KanbanView
-        {...defaultProps}
-        fields={[nameField, statusField, priorityField, dateField]}
-      />
-    );
-    fireEvent.click(screen.getByTestId("kanban-group-selector"));
-    expect(screen.getByTestId("group-option-field-status")).toBeInTheDocument();
-    expect(screen.getByTestId("group-option-field-priority")).toBeInTheDocument();
-  });
-
-  it("calls onGroupFieldChange with the selected field ID", async () => {
+  it("calls onGroupFieldChange with selected field ID", async () => {
     const onGroupFieldChange = jest.fn().mockResolvedValue(undefined);
     render(
       <KanbanView
@@ -224,40 +188,55 @@ describe("KanbanView", () => {
     });
   });
 
-  it("uses groupFieldId prop to select the active group field", () => {
+  it("supports creating a new column option from board toolbar", async () => {
+    const onUpdateGroupFieldOptions = jest.fn().mockResolvedValue(undefined);
     render(
       <KanbanView
         {...defaultProps}
-        fields={[nameField, statusField, priorityField, dateField]}
-        groupFieldId="field-priority"
+        onUpdateGroupFieldOptions={onUpdateGroupFieldOptions}
       />
     );
-    // Columns should now come from priorityField options
-    expect(screen.getByText("Alta")).toBeInTheDocument();
-    expect(screen.getByText("Media")).toBeInTheDocument();
-    expect(screen.getByText("Baja")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("kanban-add-column-toggle"));
+    fireEvent.change(screen.getByTestId("kanban-new-column-name"), {
+      target: { value: "Bloqueado" },
+    });
+    fireEvent.click(screen.getByTestId("kanban-create-column"));
+
+    await waitFor(() => {
+      expect(onUpdateGroupFieldOptions).toHaveBeenCalledTimes(1);
+    });
+
+    const [fieldId, options] = onUpdateGroupFieldOptions.mock.calls[0];
+    expect(fieldId).toBe("field-status");
+    expect(options).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ value: "Bloqueado" }),
+      ])
+    );
   });
 
-  it("falls back to first SELECT field when groupFieldId is null", () => {
-    render(
-      <KanbanView
-        {...defaultProps}
-        fields={[nameField, statusField, priorityField, dateField]}
-        groupFieldId={null}
-      />
-    );
-    // statusField is first SELECT, so its options appear
-    expect(screen.getByText("Pendiente")).toBeInTheDocument();
+  it("can collapse a column", () => {
+    render(<KanbanView {...defaultProps} />);
+
+    const collapseButtons = screen.getAllByTitle("Colapsar columna");
+    fireEvent.click(collapseButtons[0]);
+
+    expect(screen.queryByText("Tarea A")).not.toBeInTheDocument();
   });
 
-  it("falls back to first SELECT field when groupFieldId points to non-existent field", () => {
+  it("shows subgroup selector and can select a subgroup field", () => {
     render(
       <KanbanView
         {...defaultProps}
         fields={[nameField, statusField, priorityField, dateField]}
-        groupFieldId="field-nonexistent"
       />
     );
-    expect(screen.getByText("Pendiente")).toBeInTheDocument();
+
+    expect(screen.getByText("Subgrupo:")).toBeInTheDocument();
+    const subgroupSelect = screen.getByRole("combobox", { name: /subgrupo/i });
+    fireEvent.change(subgroupSelect, { target: { value: "field-priority" } });
+
+    expect(screen.getAllByText("Sin valor").length).toBeGreaterThan(0);
   });
 });

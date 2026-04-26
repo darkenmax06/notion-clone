@@ -7,12 +7,15 @@ describe("ViewSelector", () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it("renders all three view tabs", () => {
+  it("renders all six view tabs", () => {
     render(<ViewSelector activeView="TABLE" onViewChange={onViewChange} />);
 
     expect(screen.getByTestId("view-table")).toBeInTheDocument();
     expect(screen.getByTestId("view-kanban")).toBeInTheDocument();
     expect(screen.getByTestId("view-calendar")).toBeInTheDocument();
+    expect(screen.getByTestId("view-gallery")).toBeInTheDocument();
+    expect(screen.getByTestId("view-list")).toBeInTheDocument();
+    expect(screen.getByTestId("view-timeline")).toBeInTheDocument();
   });
 
   it("highlights the active view with bg-gray-100 class", () => {
@@ -25,29 +28,40 @@ describe("ViewSelector", () => {
     expect(tableBtn.className).not.toContain("bg-gray-100");
   });
 
-  it("calls onViewChange with TABLE when Tabla is clicked", () => {
+  it("calls onViewChange when Table is clicked", () => {
     render(<ViewSelector activeView="KANBAN" onViewChange={onViewChange} />);
     fireEvent.click(screen.getByTestId("view-table"));
     expect(onViewChange).toHaveBeenCalledWith("TABLE");
   });
 
-  it("calls onViewChange with KANBAN when Kanban is clicked", () => {
+  it("calls onViewChange when Kanban is clicked", () => {
     render(<ViewSelector activeView="TABLE" onViewChange={onViewChange} />);
     fireEvent.click(screen.getByTestId("view-kanban"));
     expect(onViewChange).toHaveBeenCalledWith("KANBAN");
   });
 
-  it("calls onViewChange with CALENDAR when Calendario is clicked", () => {
+  it("calls onViewChange when Calendar is clicked", () => {
     render(<ViewSelector activeView="TABLE" onViewChange={onViewChange} />);
     fireEvent.click(screen.getByTestId("view-calendar"));
     expect(onViewChange).toHaveBeenCalledWith("CALENDAR");
   });
 
-  it("does not call onViewChange when already active view is clicked", () => {
+  it("calls onViewChange when Gallery is clicked", () => {
     render(<ViewSelector activeView="TABLE" onViewChange={onViewChange} />);
-    fireEvent.click(screen.getByTestId("view-table"));
-    // still calls — ViewSelector doesn't guard duplicates, that's fine
-    expect(onViewChange).toHaveBeenCalledWith("TABLE");
+    fireEvent.click(screen.getByTestId("view-gallery"));
+    expect(onViewChange).toHaveBeenCalledWith("GALLERY");
+  });
+
+  it("calls onViewChange when List is clicked", () => {
+    render(<ViewSelector activeView="TABLE" onViewChange={onViewChange} />);
+    fireEvent.click(screen.getByTestId("view-list"));
+    expect(onViewChange).toHaveBeenCalledWith("LIST");
+  });
+
+  it("calls onViewChange when Timeline is clicked", () => {
+    render(<ViewSelector activeView="TABLE" onViewChange={onViewChange} />);
+    fireEvent.click(screen.getByTestId("view-timeline"));
+    expect(onViewChange).toHaveBeenCalledWith("TIMELINE");
   });
 
   it("shows correct label text for each view", () => {
@@ -55,14 +69,17 @@ describe("ViewSelector", () => {
     expect(screen.getByText("Tabla")).toBeInTheDocument();
     expect(screen.getByText("Kanban")).toBeInTheDocument();
     expect(screen.getByText("Calendario")).toBeInTheDocument();
+    expect(screen.getByText("Galeria")).toBeInTheDocument();
+    expect(screen.getByText("Lista")).toBeInTheDocument();
+    expect(screen.getByText("Timeline")).toBeInTheDocument();
   });
 
-  const views: ViewType[] = ["TABLE", "KANBAN", "CALENDAR"];
+  const views: ViewType[] = ["TABLE", "KANBAN", "CALENDAR", "GALLERY", "LIST", "TIMELINE"];
   views.forEach((view) => {
     it(`renders correctly with activeView=${view}`, () => {
       render(<ViewSelector activeView={view} onViewChange={onViewChange} />);
-      const btn = screen.getByTestId(`view-${view.toLowerCase()}`);
-      expect(btn.className).toContain("bg-gray-100");
+      const button = screen.getByTestId(`view-${view.toLowerCase()}`);
+      expect(button.className).toContain("bg-gray-100");
     });
   });
 });

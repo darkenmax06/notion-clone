@@ -17,7 +17,7 @@ model Page {
   id        String   @id @default(cuid())
   title     String   @default("Sin título")
   icon      String?  // emoji o URL de icono
-  cover     String?  // URL de imagen de portada
+  cover     String?  // URL de imagen, color hex o gradiente CSS
 
   // Contenido serializado de BlockNote (array de bloques)
   content   Json?
@@ -30,7 +30,15 @@ model Page {
   // Bases de datos embebidas en esta página
   databases Database[]
 
-  isDeleted Boolean  @default(false)
+  // Historial de versiones
+  versions  PageVersion[]
+
+  isDeleted   Boolean @default(false)
+  isFullWidth Boolean @default(false) // ancho completo del editor
+  isFavorite  Boolean @default(false) // página fijada en favoritos
+  isTemplate  Boolean @default(false) // plantilla reutilizable
+  isSystem    Boolean @default(false) // plantilla del sistema (no editable)
+
   position  Int      @default(0) // orden dentro del mismo padre
 
   createdAt DateTime @default(now())
@@ -38,6 +46,22 @@ model Page {
 
   @@index([parentId])
   @@index([isDeleted])
+  @@index([isFavorite])
+  @@index([isTemplate])
+}
+
+// ---------------------------------------------------------------------------
+// PAGE VERSION — snapshot del contenido de una página (máx. 20 por página)
+// ---------------------------------------------------------------------------
+model PageVersion {
+  id        String   @id @default(cuid())
+  pageId    String
+  page      Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  title     String
+  content   Json?
+  createdAt DateTime @default(now())
+
+  @@index([pageId])
 }
 
 // ---------------------------------------------------------------------------
@@ -48,7 +72,10 @@ model Database {
   title               String   @default("Base de datos sin título")
   icon                String?
   viewType            ViewType @default(TABLE)
-  kanbanGroupFieldId  String?  // ID del campo SELECT usado para agrupar columnas Kanban
+  kanbanGroupFieldId   String?  // ID del campo SELECT usado para agrupar columnas Kanban
+  galleryImageFieldId  String?  // ID del campo URL/TEXT usado como portada en Gallery
+  timelineStartFieldId String?  // ID del campo DATE de inicio para Timeline
+  timelineEndFieldId   String?  // ID del campo DATE de fin para Timeline
 
   // La página que contiene esta base de datos (puede ser null = standalone)
   pageId  String?
@@ -67,6 +94,9 @@ enum ViewType {
   TABLE
   KANBAN
   CALENDAR
+  GALLERY
+  LIST
+  TIMELINE
 }
 
 // ---------------------------------------------------------------------------

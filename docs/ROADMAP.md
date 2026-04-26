@@ -74,9 +74,11 @@
 
 ---
 
-## Fase 6 — Core UI (paridad con Notion) 🔲
+## Fase 6 — Core UI (paridad con Notion) ✅
 
 **Objetivo**: cubrir las features visibles más icónicas de Notion que un usuario nuevo espera encontrar.
+
+**Estado**: completada el 26 de abril de 2026.
 
 ### 6.1 Papelera (Trash)
 - Campo `isDeleted` ya existe en `Page` y `Record`
@@ -124,7 +126,9 @@
 
 ---
 
-## Fase 7 — Vistas adicionales de base de datos 🔲
+## Fase 7 - Vistas adicionales de base de datos [Completada]
+
+**Estado**: completada el 26 de abril de 2026.
 
 ### 7.1 Vista Gallery (Galería)
 - Nueva opción en ViewSelector: GALLERY
@@ -324,8 +328,8 @@
 | 3 | 104 |
 | 4 | 132 |
 | 5 | 181 |
-| 6 (objetivo) | ~220 |
-| 7 (objetivo) | ~260 |
+| 6 (real) | 195 |
+| 7 (real) | 215 |
 | 8 (objetivo) | ~310 |
 | 9 (objetivo) | ~350 |
 | 10 (objetivo) | ~420 |
@@ -362,3 +366,4 @@ npm test                         # suite completa
 npm run test:coverage            # con reporte de cobertura
 npm run db:studio                # Prisma Studio visual
 ```
+

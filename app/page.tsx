@@ -9,7 +9,7 @@ import { FileText, Plus } from "lucide-react";
 export default async function HomePage() {
   // Mostrar páginas raíz recientes
   const recentPages = await prisma.page.findMany({
-    where: { isDeleted: false, parentId: null },
+    where: { isDeleted: false, parentId: null, isTemplate: false },
     orderBy: { updatedAt: "desc" },
     take: 5,
     select: { id: true, title: true, icon: true, updatedAt: true },

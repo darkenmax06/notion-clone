@@ -1,6 +1,13 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
+
+function shiftIsoDate(isoDate: string, days: number): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
 
 async function main() {
   // Habilitar pg_trgm para búsqueda full-text (idempotente)
@@ -11,6 +18,7 @@ async function main() {
   await prisma.record.deleteMany();
   await prisma.field.deleteMany();
   await prisma.database.deleteMany();
+  await prisma.pageVersion.deleteMany();
   await prisma.page.deleteMany();
 
   console.log("Creando páginas de prueba…");
@@ -88,6 +96,15 @@ async function main() {
   });
 
   await prisma.page.update({
+    where: { id: projects.id },
+    data: {
+      isFavorite: true,
+      isFullWidth: true,
+      cover: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
+    },
+  });
+
+  await prisma.page.update({
     where: { id: home.id },
     data: {
       content: [
@@ -112,6 +129,96 @@ async function main() {
           children: [],
         },
       ],
+    },
+  });
+
+  // -------------------------------------------------------------------------
+  // Plantillas del sistema (Fase 6)
+  // -------------------------------------------------------------------------
+  await prisma.page.createMany({
+    data: [
+      {
+        title: "Meeting Notes",
+        icon: "📝",
+        isTemplate: true,
+        isSystem: true,
+        content: [
+          {
+            id: "tpl-meeting-1",
+            type: "heading",
+            props: { level: 1, textAlignment: "left" },
+            content: [{ type: "text", text: "Meeting Notes", styles: {} }],
+            children: [],
+          },
+        ],
+      },
+      {
+        title: "Weekly Review",
+        icon: "📆",
+        isTemplate: true,
+        isSystem: true,
+        content: [
+          {
+            id: "tpl-weekly-1",
+            type: "heading",
+            props: { level: 1, textAlignment: "left" },
+            content: [{ type: "text", text: "Weekly Review", styles: {} }],
+            children: [],
+          },
+        ],
+      },
+      {
+        title: "Project Brief",
+        icon: "🚀",
+        isTemplate: true,
+        isSystem: true,
+        content: [
+          {
+            id: "tpl-brief-1",
+            type: "heading",
+            props: { level: 1, textAlignment: "left" },
+            content: [{ type: "text", text: "Project Brief", styles: {} }],
+            children: [],
+          },
+        ],
+      },
+      {
+        title: "Bug Report",
+        icon: "🐛",
+        isTemplate: true,
+        isSystem: true,
+        content: [
+          {
+            id: "tpl-bug-1",
+            type: "heading",
+            props: { level: 1, textAlignment: "left" },
+            content: [{ type: "text", text: "Bug Report", styles: {} }],
+            children: [],
+          },
+        ],
+      },
+    ],
+  });
+
+  // -------------------------------------------------------------------------
+  // Papelera de ejemplo (Fase 6)
+  // -------------------------------------------------------------------------
+  const deletedParent = await prisma.page.create({
+    data: {
+      title: "Documento archivado",
+      icon: "🗑️",
+      isDeleted: true,
+      position: 999,
+    },
+  });
+
+  await prisma.page.create({
+    data: {
+      title: "Anexo archivado",
+      icon: "📎",
+      parentId: deletedParent.id,
+      isDeleted: true,
+      position: 0,
     },
   });
 
@@ -167,6 +274,17 @@ async function main() {
 
   const taskEstField = await prisma.field.create({
     data: { name: "Estimación (h)", type: "NUMBER", position: 5, databaseId: taskDb.id },
+  });
+  const taskStartField = await prisma.field.create({
+    data: { name: "Inicio", type: "DATE", position: 6, databaseId: taskDb.id },
+  });
+
+  const taskEndField = await prisma.field.create({
+    data: { name: "Fin", type: "DATE", position: 7, databaseId: taskDb.id },
+  });
+
+  const taskCoverField = await prisma.field.create({
+    data: { name: "Portada", type: "URL", position: 8, databaseId: taskDb.id },
   });
 
   await prisma.record.createMany({
@@ -282,6 +400,46 @@ async function main() {
     ],
   });
 
+  const taskCoverUrls = [
+    "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1200&q=60",
+    "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?auto=format&fit=crop&w=1200&q=60",
+    "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=60",
+    "https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=1200&q=60",
+  ];
+
+  const seededTaskRecords = await prisma.record.findMany({
+    where: { databaseId: taskDb.id },
+    orderBy: { position: "asc" },
+  });
+
+  for (const [index, record] of seededTaskRecords.entries()) {
+    const values = (record.values ?? {}) as Record<string, unknown>;
+    const dueDate = String(values[taskDueDateField.id] ?? "").slice(0, 10);
+    const endDate = /^\d{4}-\d{2}-\d{2}$/.test(dueDate) ? dueDate : "2026-05-01";
+    const startDate = shiftIsoDate(endDate, -Math.max(1, (index % 4) + 2));
+    const cover = taskCoverUrls[index % taskCoverUrls.length];
+
+    await prisma.record.update({
+      where: { id: record.id },
+      data: {
+        values: {
+          ...values,
+          [taskStartField.id]: startDate,
+          [taskEndField.id]: endDate,
+          [taskCoverField.id]: cover,
+        } as Prisma.InputJsonValue,
+      },
+    });
+  }
+
+  await prisma.database.update({
+    where: { id: taskDb.id },
+    data: {
+      galleryImageFieldId: taskCoverField.id,
+      timelineStartFieldId: taskStartField.id,
+      timelineEndFieldId: taskEndField.id,
+    },
+  });
   // -------------------------------------------------------------------------
   // Database 2: Eventos del mes (vista CALENDAR por defecto)
   // -------------------------------------------------------------------------
@@ -438,12 +596,12 @@ async function main() {
   });
 
   // -------------------------------------------------------------------------
-  // Database 3: Contactos (standalone, vista TABLE por defecto)
+  // Database 3: Contactos (standalone, vista LIST por defecto)
   // -------------------------------------------------------------------------
   console.log("Creando base de datos Contactos…");
 
   const contactDb = await prisma.database.create({
-    data: { title: "Contactos", icon: "👥", viewType: "TABLE" },
+    data: { title: "Contactos", icon: "👥", viewType: "LIST" },
   });
 
   const cNameField = await prisma.field.create({
@@ -508,11 +666,14 @@ async function main() {
   });
 
   console.log("✅ Seed completado:");
-  console.log("   - 6 páginas (3 raíz + 3 sub-páginas)");
+  console.log("   - 12 páginas totales:");
+  console.log("     · 6 páginas activas (3 raíz + 3 sub-páginas)");
+  console.log("     · 4 templates del sistema");
+  console.log("     · 2 páginas en papelera (padre + hija)");
   console.log("   - 3 bases de datos:");
-  console.log("     · Tareas del proyecto: 6 campos, 9 registros [KANBAN]");
+  console.log("     · Tareas del proyecto: 9 campos, 9 registros [KANBAN] + config Gallery/Timeline");
   console.log("     · Eventos del mes: 6 campos (Hora inicio + Hora fin TIME), 9 registros [CALENDAR]");
-  console.log("     · Contactos: 4 campos, 3 registros [TABLE]");
+  console.log("     · Contactos: 4 campos, 3 registros [LIST]");
 }
 
 main()

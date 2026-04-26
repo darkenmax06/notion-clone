@@ -16,6 +16,12 @@ export type DatabaseItem = {
   icon: string | null;
 };
 
+export type FavoriteItem = {
+  id: string;
+  title: string;
+  icon: string | null;
+};
+
 function buildTree(pages: Omit<PageNode, "children">[]): PageNode[] {
   const map = new Map<string, PageNode>();
   const roots: PageNode[] = [];
@@ -37,9 +43,9 @@ function buildTree(pages: Omit<PageNode, "children">[]): PageNode[] {
 }
 
 export default async function SidebarServer() {
-  const [pages, databases] = await Promise.all([
+  const [pages, databases, favorites, trashCount] = await Promise.all([
     prisma.page.findMany({
-      where: { isDeleted: false },
+      where: { isDeleted: false, isTemplate: false },
       orderBy: [{ parentId: "asc" }, { position: "asc" }],
       select: { id: true, title: true, icon: true, parentId: true, position: true },
     }),
@@ -47,9 +53,25 @@ export default async function SidebarServer() {
       orderBy: { createdAt: "asc" },
       select: { id: true, title: true, icon: true },
     }),
+    prisma.page.findMany({
+      where: { isDeleted: false, isFavorite: true, isTemplate: false },
+      orderBy: { updatedAt: "desc" },
+      take: 12,
+      select: { id: true, title: true, icon: true },
+    }),
+    prisma.page.count({
+      where: { isDeleted: true, isTemplate: false },
+    }),
   ]);
 
   const tree = buildTree(pages);
 
-  return <SidebarClient initialTree={tree} initialDatabases={databases} />;
+  return (
+    <SidebarClient
+      initialTree={tree}
+      initialDatabases={databases}
+      initialFavorites={favorites}
+      initialTrashCount={trashCount}
+    />
+  );
 }

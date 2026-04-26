@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   try {
     const pages = await prisma.page.findMany({
-      where: { isDeleted: false },
+      where: { isDeleted: false, isTemplate: false },
       orderBy: [{ parentId: "asc" }, { position: "asc" }],
       select: {
         id: true,

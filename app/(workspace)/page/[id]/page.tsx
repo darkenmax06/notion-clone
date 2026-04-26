@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation";
+import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
 import type { Block } from "@blocknote/core";
 import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/Breadcrumb";
@@ -39,6 +40,8 @@ export default async function PageDetail({ params }: Props) {
         title: true,
         icon: true,
         cover: true,
+        isFullWidth: true,
+        isFavorite: true,
         content: true,
       },
     }),
@@ -47,23 +50,30 @@ export default async function PageDetail({ params }: Props) {
 
   if (!page) notFound();
 
+  const editorContent = (page.content as Block[] | null) ?? undefined;
+  const editorContentHash = createHash("sha1")
+    .update(JSON.stringify(editorContent ?? []))
+    .digest("hex");
+
   return (
     <main className="flex min-h-screen flex-col">
-      {page.cover && (
-        <div
-          className="h-40 w-full bg-cover bg-center"
-          style={{ backgroundImage: `url(${page.cover})` }}
-        />
-      )}
-
       <Breadcrumb items={breadcrumbs} />
 
-      <PageTitleEditor pageId={page.id} initialTitle={page.title} icon={page.icon} />
-
-      <BlockEditorClient
+      <PageTitleEditor
         pageId={page.id}
         initialTitle={page.title}
-        initialContent={(page.content as Block[] | null) ?? undefined}
+        icon={page.icon}
+        initialCover={page.cover}
+        isFullWidth={page.isFullWidth}
+        isFavorite={page.isFavorite}
+      />
+
+      <BlockEditorClient
+        key={`${page.id}-${editorContentHash}`}
+        pageId={page.id}
+        initialTitle={page.title}
+        initialContent={editorContent}
+        isFullWidth={page.isFullWidth}
       />
     </main>
   );

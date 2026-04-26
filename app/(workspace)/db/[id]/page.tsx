@@ -43,6 +43,9 @@ export default async function DatabasePage({ params }: Props) {
           icon: db.icon,
           viewType: db.viewType as ViewType,
           kanbanGroupFieldId: db.kanbanGroupFieldId,
+          galleryImageFieldId: db.galleryImageFieldId,
+          timelineStartFieldId: db.timelineStartFieldId,
+          timelineEndFieldId: db.timelineEndFieldId,
         }}
         fields={fields}
         records={records}

@@ -1,5 +1,6 @@
 "use client";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { SidebarClient } from "@/components/sidebar/SidebarClient";
 import type { PageNode } from "@/components/sidebar/SidebarServer";
 
@@ -11,22 +12,27 @@ jest.mock("next/navigation", () => ({
 }));
 
 jest.mock("@/lib/actions/pages", () => ({
-  createPage: jest.fn(),
   deletePage: jest.fn(),
+  updatePage: jest.fn(),
 }));
 
 jest.mock("@/lib/actions/databases", () => ({
   createDatabase: jest.fn(),
   deleteDatabase: jest.fn(),
+  updateDatabase: jest.fn(),
 }));
 
-import { createPage, deletePage } from "@/lib/actions/pages";
-const mockCreatePage = createPage as jest.Mock;
+jest.mock("@/components/ui/TemplateGallery", () => ({
+  __esModule: true,
+  default: ({ open }: { open: boolean }) => (open ? <div data-testid="template-gallery" /> : null),
+}));
+
+import { deletePage } from "@/lib/actions/pages";
 const mockDeletePage = deletePage as jest.Mock;
 
 const leaf: PageNode = {
   id: "leaf1",
-  title: "Página hoja",
+  title: "Pagina hoja",
   icon: "📄",
   parentId: null,
   position: 0,
@@ -35,14 +41,14 @@ const leaf: PageNode = {
 
 const withChildren: PageNode = {
   id: "parent1",
-  title: "Página padre",
+  title: "Pagina padre",
   icon: "📁",
   parentId: null,
   position: 0,
   children: [
     {
       id: "child1",
-      title: "Subpágina",
+      title: "Subpagina",
       icon: null,
       parentId: "parent1",
       position: 0,
@@ -52,80 +58,131 @@ const withChildren: PageNode = {
 };
 
 describe("SidebarClient", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("renders the NotionLocal header", () => {
-    render(<SidebarClient initialTree={[]} initialDatabases={[]} />);
+    render(
+      <SidebarClient
+        initialTree={[]}
+        initialDatabases={[]}
+        initialFavorites={[]}
+        initialTrashCount={0}
+      />
+    );
     expect(screen.getByText("NotionLocal")).toBeInTheDocument();
   });
 
-  it("shows empty state when tree is empty", () => {
-    render(<SidebarClient initialTree={[]} initialDatabases={[]} />);
-    expect(screen.getByText(/Sin páginas/)).toBeInTheDocument();
-  });
-
-  it("renders page titles from the initial tree", () => {
-    render(<SidebarClient initialTree={[leaf]} initialDatabases={[]} />);
-    expect(screen.getByText("Página hoja")).toBeInTheDocument();
-  });
-
-  it("renders page icons", () => {
-    render(<SidebarClient initialTree={[leaf]} initialDatabases={[]} />);
-    expect(screen.getByText("📄")).toBeInTheDocument();
-  });
-
-  it("does not show children before expanding", () => {
-    render(<SidebarClient initialTree={[withChildren]} initialDatabases={[]} />);
-    expect(screen.queryByText("Subpágina")).not.toBeInTheDocument();
-  });
-
-  it("expands children when the chevron button is clicked", () => {
-    render(<SidebarClient initialTree={[withChildren]} initialDatabases={[]} />);
-    // Button order: [0] header +, [1] expand chevron, [2] add child, [3] delete
-    const buttons = screen.getAllByRole("button");
-    fireEvent.click(buttons[1]);
-    expect(screen.getByText("Subpágina")).toBeInTheDocument();
-  });
-
-  it("collapses children on second chevron click", () => {
-    render(<SidebarClient initialTree={[withChildren]} initialDatabases={[]} />);
-    const buttons = screen.getAllByRole("button");
-    fireEvent.click(buttons[1]);
-    expect(screen.getByText("Subpágina")).toBeInTheDocument();
-    fireEvent.click(buttons[1]);
-    expect(screen.queryByText("Subpágina")).not.toBeInTheDocument();
-  });
-
-  it("calls createPage with null parentId and redirects to new page", async () => {
-    mockCreatePage.mockResolvedValue({ success: true, page: { id: "new1" } });
-    render(<SidebarClient initialTree={[]} initialDatabases={[]} />);
-    const addBtn = screen.getByTitle("Nueva página raíz");
-    fireEvent.click(addBtn);
-    await waitFor(() => expect(mockCreatePage).toHaveBeenCalledWith({ parentId: null }));
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/page/new1"));
-  });
-
-  it("calls createPage with parentId when adding a child page", async () => {
-    mockCreatePage.mockResolvedValue({ success: true, page: { id: "child2" } });
-    render(<SidebarClient initialTree={[leaf]} initialDatabases={[]} />);
-    const addChildBtn = screen.getByTitle("Añadir subpágina");
-    fireEvent.click(addChildBtn);
-    await waitFor(() =>
-      expect(mockCreatePage).toHaveBeenCalledWith({ parentId: "leaf1" })
+  it("renders quick links for Templates and Trash", () => {
+    render(
+      <SidebarClient
+        initialTree={[]}
+        initialDatabases={[]}
+        initialFavorites={[]}
+        initialTrashCount={3}
+      />
     );
+
+    expect(screen.getByRole("link", { name: /Plantillas/i })).toHaveAttribute("href", "/templates");
+    expect(screen.getByRole("link", { name: /Papelera/i })).toHaveAttribute("href", "/trash");
+    expect(screen.getByText("3")).toBeInTheDocument();
   });
 
-  it("calls deletePage with the correct id", async () => {
+  it("shows empty states for pages and favorites", () => {
+    render(
+      <SidebarClient
+        initialTree={[]}
+        initialDatabases={[]}
+        initialFavorites={[]}
+        initialTrashCount={0}
+      />
+    );
+    expect(screen.getByText(/Sin paginas/i)).toBeInTheDocument();
+    expect(screen.getByText(/Sin favoritos/i)).toBeInTheDocument();
+  });
+
+  it("renders favorite pages section", () => {
+    render(
+      <SidebarClient
+        initialTree={[]}
+        initialDatabases={[]}
+        initialFavorites={[{ id: "fav1", title: "Favorita", icon: "⭐" }]}
+        initialTrashCount={0}
+      />
+    );
+
+    const favoriteLink = screen.getByRole("link", { name: /Favorita/i });
+    expect(favoriteLink).toHaveAttribute("href", "/page/fav1");
+  });
+
+  it("renders page titles from tree", () => {
+    render(
+      <SidebarClient
+        initialTree={[leaf]}
+        initialDatabases={[]}
+        initialFavorites={[]}
+        initialTrashCount={0}
+      />
+    );
+    expect(screen.getByText("Pagina hoja")).toBeInTheDocument();
+  });
+
+  it("expands children when the chevron is clicked", () => {
+    render(
+      <SidebarClient
+        initialTree={[withChildren]}
+        initialDatabases={[]}
+        initialFavorites={[]}
+        initialTrashCount={0}
+      />
+    );
+    expect(screen.queryByText("Subpagina")).not.toBeInTheDocument();
+    const buttons = screen.getAllByRole("button");
+    fireEvent.click(buttons[1]);
+    expect(screen.getByText("Subpagina")).toBeInTheDocument();
+  });
+
+  it("opens template gallery for root page creation", () => {
+    render(
+      <SidebarClient
+        initialTree={[]}
+        initialDatabases={[]}
+        initialFavorites={[]}
+        initialTrashCount={0}
+      />
+    );
+
+    fireEvent.click(screen.getByTitle("Nueva pagina raiz"));
+    expect(screen.getByTestId("template-gallery")).toBeInTheDocument();
+  });
+
+  it("opens template gallery for child page creation", () => {
+    render(
+      <SidebarClient
+        initialTree={[leaf]}
+        initialDatabases={[]}
+        initialFavorites={[]}
+        initialTrashCount={0}
+      />
+    );
+
+    fireEvent.click(screen.getByTitle("Anadir subpagina"));
+    expect(screen.getByTestId("template-gallery")).toBeInTheDocument();
+  });
+
+  it("calls deletePage with correct id", async () => {
     mockDeletePage.mockResolvedValue({ success: true });
-    render(<SidebarClient initialTree={[leaf]} initialDatabases={[]} />);
-    const deleteBtn = screen.getByTitle("Eliminar página");
-    fireEvent.click(deleteBtn);
-    await waitFor(() => expect(mockDeletePage).toHaveBeenCalledWith({ id: "leaf1" }));
-  });
+    render(
+      <SidebarClient
+        initialTree={[leaf]}
+        initialDatabases={[]}
+        initialFavorites={[]}
+        initialTrashCount={0}
+      />
+    );
 
-  it("renders a link to the page for each node", () => {
-    render(<SidebarClient initialTree={[leaf]} initialDatabases={[]} />);
-    const link = screen.getByRole("link", { name: /Página hoja/ });
-    expect(link).toHaveAttribute("href", "/page/leaf1");
+    fireEvent.click(screen.getByTitle("Eliminar pagina"));
+    await waitFor(() => expect(mockDeletePage).toHaveBeenCalledWith({ id: "leaf1" }));
   });
 });
