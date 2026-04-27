@@ -38,6 +38,11 @@ function formatValue(field: FieldRow, value: unknown): string {
     return value.map((item) => String(item)).join(", ");
   }
 
+  if (typeof value === "object" && value !== null) {
+    const maybeName = (value as { name?: unknown }).name;
+    if (typeof maybeName === "string") return maybeName;
+  }
+
   return String(value);
 }
 

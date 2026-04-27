@@ -20,7 +20,28 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     });
 
     if (!db) return NextResponse.json({ error: "Base de datos no encontrada" }, { status: 404 });
-    return NextResponse.json({ database: db });
+
+    const relationFieldIds = db.fields
+      .filter((field) => field.type === "RELATION")
+      .map((field) => field.id);
+
+    const recordRelations =
+      relationFieldIds.length > 0
+        ? await prisma.recordRelation.findMany({
+            where: {
+              fieldId: { in: relationFieldIds },
+              sourceRecord: { databaseId: id, isDeleted: false },
+              targetRecord: { isDeleted: false },
+            },
+            select: {
+              sourceRecordId: true,
+              targetRecordId: true,
+              fieldId: true,
+            },
+          })
+        : [];
+
+    return NextResponse.json({ database: { ...db, recordRelations } });
   } catch (error) {
     console.error("[GET /api/databases/[id]]", error);
     return NextResponse.json({ error: "Error al obtener base de datos" }, { status: 500 });

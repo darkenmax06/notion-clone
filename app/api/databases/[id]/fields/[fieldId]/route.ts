@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { normalizeFieldOptions } from "@/lib/database/field-options";
 
 type RouteContext = { params: Promise<{ id: string; fieldId: string }> };
 
 const UpdateFieldSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   options: z
-    .array(
-      z.object({
-        value: z.string().min(1),
-        color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-      })
-    )
+    .union([
+      z.array(
+        z.object({
+          value: z.string().min(1),
+          color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+        })
+      ),
+      z.record(z.unknown()),
+    ])
     .optional(),
 });
 
@@ -29,7 +33,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       where: { id: fieldId },
       data: {
         ...(data.name !== undefined && { name: data.name }),
-        ...(data.options !== undefined && { options: data.options }),
+        ...(data.options !== undefined && { options: normalizeFieldOptions(existing.type, data.options) }),
       },
     });
 

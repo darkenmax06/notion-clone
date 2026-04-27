@@ -167,7 +167,9 @@
 
 ---
 
-## Fase 8 — Campos avanzados de base de datos 🔲
+## Fase 8 - Campos avanzados de base de datos [Completada]
+
+**Estado**: completada el 26 de abril de 2026.
 
 ### 8.1 Campo Relation (Relación entre bases de datos)
 - Nuevo `FieldType`: `RELATION`
@@ -330,7 +332,7 @@
 | 5 | 181 |
 | 6 (real) | 195 |
 | 7 (real) | 215 |
-| 8 (objetivo) | ~310 |
+| 8 (real) | 226 |
 | 9 (objetivo) | ~350 |
 | 10 (objetivo) | ~420 |
 | 11 (objetivo) | ~460 |

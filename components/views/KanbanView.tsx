@@ -20,8 +20,8 @@ import { CSS } from "@dnd-kit/utilities";
 import { Plus, GripVertical, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
 import { FieldType } from "@prisma/client";
 import type { FieldRow, RecordRow } from "./DatabaseView";
-import type { SelectOption } from "./TableCell";
 import { cn } from "@/lib/utils";
+import { getSelectOptions, type SelectOption } from "@/lib/database/field-options";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -143,7 +143,7 @@ function buildSubgroups(records: RecordRow[], field: FieldRow | null): Subgroup[
 }
 
 function buildColumns(records: RecordRow[], groupField: FieldRow): KanbanColumn[] {
-  const options: SelectOption[] = groupField.options ?? [];
+  const options: SelectOption[] = getSelectOptions(groupField.options);
 
   const columns: KanbanColumn[] = options.map((option) => ({
     id: option.value,
@@ -559,7 +559,7 @@ export default function KanbanView({
     const trimmedName = newColumnName.trim();
     if (!trimmedName) return;
 
-    const options = groupField.options ?? [];
+    const options = getSelectOptions(groupField.options);
     const exists = options.some((option) => option.value.toLowerCase() === trimmedName.toLowerCase());
     if (exists) return;
 

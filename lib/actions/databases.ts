@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { FieldType, ViewType } from "@prisma/client";
+import { normalizeFieldOptions } from "@/lib/database/field-options";
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -30,15 +31,17 @@ const SelectOptionSchema = z.object({
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
 });
 
+const FieldOptionsSchema = z.union([z.array(SelectOptionSchema), z.record(z.unknown())]);
+
 const CreateFieldSchema = z.object({
   name: z.string().min(1).max(255),
   type: z.nativeEnum(FieldType),
-  options: z.array(SelectOptionSchema).optional(),
+  options: FieldOptionsSchema.optional(),
 });
 
 const UpdateFieldSchema = z.object({
   name: z.string().min(1).max(255).optional(),
-  options: z.array(SelectOptionSchema).optional(),
+  options: FieldOptionsSchema.optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -116,7 +119,7 @@ export async function createField(
     data: {
       name: data.name,
       type: data.type,
-      options: data.options ?? [],
+      options: normalizeFieldOptions(data.type, data.options),
       position: (lastField?.position ?? -1) + 1,
       databaseId,
     },
@@ -133,12 +136,20 @@ export async function updateField(
   input: z.infer<typeof UpdateFieldSchema>
 ) {
   const data = UpdateFieldSchema.parse(input);
+  const existing = await prisma.field.findUnique({
+    where: { id: fieldId },
+    select: { type: true },
+  });
+
+  if (!existing) {
+    throw new Error("Campo no encontrado");
+  }
 
   const field = await prisma.field.update({
     where: { id: fieldId },
     data: {
       ...(data.name !== undefined && { name: data.name }),
-      ...(data.options !== undefined && { options: data.options }),
+      ...(data.options !== undefined && { options: normalizeFieldOptions(existing.type, data.options) }),
     },
   });
 

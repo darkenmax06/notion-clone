@@ -17,6 +17,7 @@ jest.mock("@/lib/actions/records", () => ({
   createRecord: jest.fn().mockResolvedValue({ success: true, record: { id: "new", position: 99 } }),
   updateRecord: jest.fn().mockResolvedValue({ success: true }),
   deleteRecord: jest.fn().mockResolvedValue({ success: true }),
+  setRecordRelations: jest.fn().mockResolvedValue({ success: true }),
 }));
 
 const fields: FieldRow[] = [

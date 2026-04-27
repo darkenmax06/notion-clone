@@ -54,7 +54,12 @@ const OPERATORS_BY_TYPE: Record<FieldType, { value: FilterOperator; label: strin
   DATE: [
     { value: "equals", label: "es" },
     { value: "before", label: "antes de" },
-    { value: "after", label: "después de" },
+    { value: "after", label: "despues de" },
+  ],
+  TIME: [
+    { value: "equals", label: "es" },
+    { value: "before", label: "antes de" },
+    { value: "after", label: "despues de" },
   ],
   SELECT: [
     { value: "is", label: "es" },
@@ -76,10 +81,27 @@ const OPERATORS_BY_TYPE: Record<FieldType, { value: FilterOperator; label: strin
     { value: "contains", label: "contiene" },
     { value: "equals", label: "es igual a" },
   ],
-  TIME: [
-    { value: "equals", label: "es" },
-    { value: "before", label: "antes de" },
-    { value: "after", label: "después de" },
+  RELATION: [
+    { value: "contains", label: "contiene" },
+    { value: "is", label: "es" },
+    { value: "is_not", label: "no es" },
+  ],
+  ROLLUP: [
+    { value: "equals", label: "=" },
+    { value: "gt", label: ">" },
+    { value: "lt", label: "<" },
+  ],
+  FORMULA: [
+    { value: "contains", label: "contiene" },
+    { value: "equals", label: "es igual a" },
+  ],
+  PERSON: [
+    { value: "contains", label: "contiene" },
+    { value: "equals", label: "es igual a" },
+  ],
+  FILE: [
+    { value: "contains", label: "contiene" },
+    { value: "equals", label: "es igual a" },
   ],
 };
 
@@ -98,81 +120,96 @@ export function FilterSortBar({ fields, filters, onFiltersChange, sortConfig, on
   }
 
   function updateFilter(id: string, patch: Partial<FilterRule>) {
-    onFiltersChange(filters.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+    onFiltersChange(filters.map((filter) => (filter.id === id ? { ...filter, ...patch } : filter)));
   }
 
   function removeFilter(id: string) {
-    onFiltersChange(filters.filter((f) => f.id !== id));
+    onFiltersChange(filters.filter((filter) => filter.id !== id));
   }
 
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-900">
-      {/* Filter button */}
       <button
-        onClick={() => { setShowFilters((v) => !v); setShowSort(false); }}
+        onClick={() => {
+          setShowFilters((value) => !value);
+          setShowSort(false);
+        }}
         className={cn(
           "flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800",
-          filters.length > 0 && "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
+          filters.length > 0 && "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
         )}
       >
         <Filter size={12} />
         Filtrar {filters.length > 0 && `(${filters.length})`}
       </button>
 
-      {/* Sort button */}
       <button
-        onClick={() => { setShowSort((v) => !v); setShowFilters(false); }}
+        onClick={() => {
+          setShowSort((value) => !value);
+          setShowFilters(false);
+        }}
         className={cn(
           "flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800",
-          sortConfig && "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
+          sortConfig && "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
         )}
       >
         <ArrowUpDown size={12} />
-        Ordenar {sortConfig && `↑↓`}
+        Ordenar {sortConfig && "<>"}
       </button>
 
-      {/* Clear all */}
       {(filters.length > 0 || sortConfig) && (
         <button
-          onClick={() => { onFiltersChange([]); onSortChange(null); }}
+          onClick={() => {
+            onFiltersChange([]);
+            onSortChange(null);
+          }}
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50"
         >
           <X size={12} /> Limpiar
         </button>
       )}
 
-      {/* Filter panel */}
       {showFilters && (
         <div className="w-full space-y-2 rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800">
           {filters.map((rule) => {
-            const field = fields.find((f) => f.id === rule.fieldId);
-            const ops = field ? OPERATORS_BY_TYPE[field.type] : [];
+            const field = fields.find((entry) => entry.id === rule.fieldId);
+            const operators = field ? OPERATORS_BY_TYPE[field.type] : [];
             const needsValue = rule.operator !== "is_checked" && rule.operator !== "is_not_checked";
 
             return (
               <div key={rule.id} className="flex flex-wrap items-center gap-2">
                 <select
                   value={rule.fieldId}
-                  onChange={(e) => {
-                    const newField = fields.find((f) => f.id === e.target.value);
+                  onChange={(event) => {
+                    const newField = fields.find((entry) => entry.id === event.target.value);
                     if (!newField) return;
-                    const newOps = OPERATORS_BY_TYPE[newField.type];
-                    updateFilter(rule.id, { fieldId: e.target.value, operator: newOps[0].value, value: "" });
+                    const newOperators = OPERATORS_BY_TYPE[newField.type];
+                    updateFilter(rule.id, {
+                      fieldId: event.target.value,
+                      operator: newOperators[0].value,
+                      value: "",
+                    });
                   }}
                   className="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                 >
-                  {fields.map((f) => (
-                    <option key={f.id} value={f.id}>{f.name}</option>
+                  {fields.map((entry) => (
+                    <option key={entry.id} value={entry.id}>
+                      {entry.name}
+                    </option>
                   ))}
                 </select>
 
                 <select
                   value={rule.operator}
-                  onChange={(e) => updateFilter(rule.id, { operator: e.target.value as FilterOperator })}
+                  onChange={(event) =>
+                    updateFilter(rule.id, { operator: event.target.value as FilterOperator })
+                  }
                   className="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                 >
-                  {ops.map((op) => (
-                    <option key={op.value} value={op.value}>{op.label}</option>
+                  {operators.map((operator) => (
+                    <option key={operator.value} value={operator.value}>
+                      {operator.label}
+                    </option>
                   ))}
                 </select>
 
@@ -180,8 +217,8 @@ export function FilterSortBar({ fields, filters, onFiltersChange, sortConfig, on
                   <input
                     type="text"
                     value={rule.value}
-                    onChange={(e) => updateFilter(rule.id, { value: e.target.value })}
-                    placeholder="valor…"
+                    onChange={(event) => updateFilter(rule.id, { value: event.target.value })}
+                    placeholder="valor..."
                     className="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                   />
                 )}
@@ -193,40 +230,46 @@ export function FilterSortBar({ fields, filters, onFiltersChange, sortConfig, on
             );
           })}
 
-          <button
-            onClick={addFilter}
-            className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
-          >
-            <Plus size={12} /> Añadir filtro
+          <button onClick={addFilter} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
+            <Plus size={12} /> Anadir filtro
           </button>
         </div>
       )}
 
-      {/* Sort panel */}
       {showSort && (
         <div className="flex w-full flex-wrap items-center gap-2 rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800">
           <select
             value={sortConfig?.fieldId ?? ""}
-            onChange={(e) => {
-              if (!e.target.value) { onSortChange(null); return; }
-              onSortChange({ fieldId: e.target.value, direction: sortConfig?.direction ?? "asc" });
+            onChange={(event) => {
+              if (!event.target.value) {
+                onSortChange(null);
+                return;
+              }
+              onSortChange({
+                fieldId: event.target.value,
+                direction: sortConfig?.direction ?? "asc",
+              });
             }}
             className="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
           >
-            <option value="">— sin orden —</option>
-            {fields.map((f) => (
-              <option key={f.id} value={f.id}>{f.name}</option>
+            <option value="">- sin orden -</option>
+            {fields.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.name}
+              </option>
             ))}
           </select>
 
           {sortConfig && (
             <select
               value={sortConfig.direction}
-              onChange={(e) => onSortChange({ ...sortConfig, direction: e.target.value as "asc" | "desc" })}
+              onChange={(event) =>
+                onSortChange({ ...sortConfig, direction: event.target.value as "asc" | "desc" })
+              }
               className="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
             >
-              <option value="asc">Ascendente ↑</option>
-              <option value="desc">Descendente ↓</option>
+              <option value="asc">Ascendente</option>
+              <option value="desc">Descendente</option>
             </select>
           )}
         </div>
@@ -234,3 +277,4 @@ export function FilterSortBar({ fields, filters, onFiltersChange, sortConfig, on
     </div>
   );
 }
+

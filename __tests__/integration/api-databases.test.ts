@@ -14,11 +14,15 @@ jest.mock("@/lib/prisma", () => ({
       update: jest.fn(),
       delete: jest.fn(),
     },
+    recordRelation: {
+      findMany: jest.fn(),
+    },
   },
 }));
 
 import { prisma } from "@/lib/prisma";
 const mockDb = prisma.database as jest.Mocked<typeof prisma.database>;
+const mockRecordRelation = prisma.recordRelation as jest.Mocked<typeof prisma.recordRelation>;
 
 const DB_ID = "ctest00000000000000000001";
 
@@ -116,6 +120,26 @@ describe("GET /api/databases/[id]", () => {
 
     const res = await GET_ONE(makeRequest(`/api/databases/nonexistent`), makeContext("nonexistent"));
     expect(res.status).toBe(404);
+  });
+
+  it("includes recordRelations for relation fields", async () => {
+    (mockDb.findUnique as jest.Mock).mockResolvedValue({
+      id: DB_ID,
+      title: "Tareas",
+      icon: null,
+      fields: [{ id: "field-rel", type: "RELATION" }],
+      records: [],
+    });
+    (mockRecordRelation.findMany as jest.Mock).mockResolvedValue([
+      { sourceRecordId: "r1", targetRecordId: "r2", fieldId: "field-rel" },
+    ]);
+
+    const res = await GET_ONE(makeRequest(`/api/databases/${DB_ID}`), makeContext(DB_ID));
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.database.recordRelations).toHaveLength(1);
+    expect(mockRecordRelation.findMany).toHaveBeenCalledTimes(1);
   });
 });
 

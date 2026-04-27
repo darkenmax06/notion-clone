@@ -8,6 +8,11 @@ import {
   Link,
   Mail,
   List,
+  Link2,
+  Sigma,
+  FunctionSquare,
+  UserCircle2,
+  Paperclip,
 } from "lucide-react";
 import { FieldType } from "@prisma/client";
 
@@ -21,6 +26,11 @@ const icons: Record<FieldType, React.ReactNode> = {
   CHECKBOX: <CheckSquare size={14} />,
   URL: <Link size={14} />,
   EMAIL: <Mail size={14} />,
+  RELATION: <Link2 size={14} />,
+  ROLLUP: <Sigma size={14} />,
+  FORMULA: <FunctionSquare size={14} />,
+  PERSON: <UserCircle2 size={14} />,
+  FILE: <Paperclip size={14} />,
 };
 
 export function FieldTypeIcon({ type }: { type: FieldType }) {

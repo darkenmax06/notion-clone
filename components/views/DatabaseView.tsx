@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { FieldType } from "@prisma/client";
 import { Plus, Trash2, ExternalLink, Download, ChevronDown, Smile } from "lucide-react";
 import { createField, updateField, deleteField, updateDatabase } from "@/lib/actions/databases";
-import { createRecord, updateRecord, deleteRecord } from "@/lib/actions/records";
-import { TableCell, type SelectOption } from "./TableCell";
+import { createRecord, updateRecord, deleteRecord, setRecordRelations } from "@/lib/actions/records";
+import { TableCell, type RelationCandidate, type FileCellValue } from "./TableCell";
 import { FieldHeader } from "./FieldHeader";
 import { FilterSortBar, type FilterRule, type SortConfig } from "./FilterSortBar";
 import { RecordDetailPanel } from "./RecordDetailPanel";
@@ -18,6 +18,15 @@ import GalleryView from "./GalleryView";
 import ListView from "./ListView";
 import TimelineView from "./TimelineView";
 import { cn } from "@/lib/utils";
+import {
+  computeRuntimeValues,
+  getRecordTitleForDatabase,
+  type RelationDatabase,
+} from "@/lib/database/computed-fields";
+import {
+  getFieldOptionsObject,
+  type FieldOptions,
+} from "@/lib/database/field-options";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -28,7 +37,7 @@ export type FieldRow = {
   name: string;
   type: FieldType;
   position: number;
-  options: SelectOption[];
+  options: FieldOptions;
 };
 
 export type RecordRow = {
@@ -50,6 +59,7 @@ type Props = {
   };
   fields: FieldRow[];
   records: RecordRow[];
+  relationDatabases?: RelationDatabase[];
 };
 
 type TableGroup = {
@@ -62,12 +72,22 @@ type TableGroup = {
 // Filter helpers
 // ---------------------------------------------------------------------------
 
+function toComparableString(value: unknown): string {
+  if (Array.isArray(value)) return value.map((item) => String(item)).join(" ");
+  if (typeof value === "object" && value !== null) {
+    const maybeName = (value as { name?: unknown }).name;
+    if (typeof maybeName === "string") return maybeName;
+    return JSON.stringify(value);
+  }
+  return String(value ?? "");
+}
+
 function applyFilters(records: RecordRow[], filters: FilterRule[]): RecordRow[] {
   if (filters.length === 0) return records;
   return records.filter((record) =>
     filters.every((rule) => {
       const val = record.values[rule.fieldId];
-      const str = String(val ?? "").toLowerCase();
+      const str = toComparableString(val).toLowerCase();
       const ruleVal = rule.value.toLowerCase();
       switch (rule.operator) {
         case "contains": return str.includes(ruleVal);
@@ -92,8 +112,8 @@ function applySort(records: RecordRow[], sortConfig: SortConfig | null): RecordR
   return [...records].sort((a, b) => {
     const av = a.values[sortConfig.fieldId];
     const bv = b.values[sortConfig.fieldId];
-    const as = String(av ?? "");
-    const bs = String(bv ?? "");
+    const as = toComparableString(av);
+    const bs = toComparableString(bv);
     const cmp = as.localeCompare(bs, undefined, { numeric: true });
     return sortConfig.direction === "asc" ? cmp : -cmp;
   });
@@ -152,7 +172,12 @@ function buildTableGroups(records: RecordRow[], field: FieldRow): TableGroup[] {
 // DatabaseView
 // ---------------------------------------------------------------------------
 
-export default function DatabaseView({ database, fields: initialFields, records: initialRecords }: Props) {
+export default function DatabaseView({
+  database,
+  fields: initialFields,
+  records: initialRecords,
+  relationDatabases = [],
+}: Props) {
   const [fields, setFields] = useState<FieldRow[]>(initialFields);
   const [records, setRecords] = useState<RecordRow[]>(initialRecords);
   const [editingCell, setEditingCell] = useState<{ recordId: string; fieldId: string } | null>(null);
@@ -216,14 +241,52 @@ export default function DatabaseView({ database, fields: initialFields, records:
     [fields]
   );
 
+  const relationDatabaseById = useMemo(
+    () => new Map(relationDatabases.map((relationDb) => [relationDb.id, relationDb])),
+    [relationDatabases]
+  );
+
+  const relationCandidatesByFieldId = useMemo(() => {
+    const map = new Map<string, RelationCandidate[]>();
+
+    sortedFields.forEach((field) => {
+      if (field.type !== "RELATION") return;
+      const options = getFieldOptionsObject(field.options);
+      const relationDatabaseId = options.relationDatabaseId;
+      if (!relationDatabaseId) {
+        map.set(field.id, []);
+        return;
+      }
+      const relationDb = relationDatabaseById.get(relationDatabaseId);
+      if (!relationDb) {
+        map.set(field.id, []);
+        return;
+      }
+      map.set(
+        field.id,
+        relationDb.records.map((record) => ({
+          id: record.id,
+          label: getRecordTitleForDatabase(relationDb, record),
+        }))
+      );
+    });
+
+    return map;
+  }, [sortedFields, relationDatabaseById]);
+
+  const runtimeRecords = useMemo(
+    () => computeRuntimeValues(records, sortedFields, relationDatabases),
+    [records, sortedFields, relationDatabases]
+  );
+
   const displayRecords = useMemo(
-    () => applySort(applyFilters(records, filters), sortConfig),
-    [records, filters, sortConfig]
+    () => applySort(applyFilters(runtimeRecords, filters), sortConfig),
+    [runtimeRecords, filters, sortConfig]
   );
 
   const selectedRecord = useMemo(
-    () => records.find((r) => r.id === selectedRecordId) ?? null,
-    [records, selectedRecordId]
+    () => runtimeRecords.find((record) => record.id === selectedRecordId) ?? null,
+    [runtimeRecords, selectedRecordId]
   );
 
   const tableGroupableFields = useMemo(
@@ -288,6 +351,73 @@ export default function DatabaseView({ database, fields: initialFields, records:
     setCollapsedTableGroups({});
   }
 
+  const relationFieldIds = useMemo(
+    () => new Set(sortedFields.filter((field) => field.type === "RELATION").map((field) => field.id)),
+    [sortedFields]
+  );
+
+  const computedFieldIds = useMemo(
+    () =>
+      new Set(
+        sortedFields
+          .filter((field) => field.type === "ROLLUP" || field.type === "FORMULA")
+          .map((field) => field.id)
+      ),
+    [sortedFields]
+  );
+
+  async function persistRecordValues(recordId: string, values: Record<string, unknown>) {
+    const persistableValues: Record<string, unknown> = { ...values };
+    const relationUpdates: Array<{ fieldId: string; targetRecordIds: string[] }> = [];
+
+    sortedFields.forEach((field) => {
+      if (computedFieldIds.has(field.id)) {
+        delete persistableValues[field.id];
+        return;
+      }
+
+      if (relationFieldIds.has(field.id)) {
+        const rawValue = values[field.id];
+        const ids = Array.isArray(rawValue)
+          ? rawValue.filter((item): item is string => typeof item === "string")
+          : [];
+        relationUpdates.push({ fieldId: field.id, targetRecordIds: ids });
+        delete persistableValues[field.id];
+      }
+    });
+
+    await Promise.all([
+      updateRecord(recordId, database.id, persistableValues),
+      ...relationUpdates.map((update) =>
+        setRecordRelations(recordId, database.id, update.fieldId, update.targetRecordIds)
+      ),
+    ]);
+  }
+
+  async function handleUploadFile(file: File): Promise<FileCellValue | null> {
+    const payload = new FormData();
+    payload.append("file", file);
+
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: payload,
+      });
+
+      if (!response.ok) {
+        console.error("Upload failed", await response.text());
+        return null;
+      }
+
+      const data = (await response.json()) as FileCellValue;
+      if (!data?.url || !data?.name) return null;
+      return data;
+    } catch (error) {
+      console.error("Upload failed", error);
+      return null;
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Record handlers
   // ---------------------------------------------------------------------------
@@ -330,21 +460,24 @@ export default function DatabaseView({ database, fields: initialFields, records:
 
   async function handleSaveCell(recordId: string, fieldId: string, value: unknown) {
     setEditingCell(null);
-    setRecords((prev) =>
-      prev.map((record) =>
-        record.id === recordId ? { ...record, values: { ...record.values, [fieldId]: value } } : record
-      )
-    );
     const record = records.find((item) => item.id === recordId);
     if (!record) return;
-    await updateRecord(recordId, database.id, { ...record.values, [fieldId]: value });
+    const nextValues = { ...record.values, [fieldId]: value };
+
+    setRecords((prev) =>
+      prev.map((record) =>
+        record.id === recordId ? { ...record, values: nextValues } : record
+      )
+    );
+
+    await persistRecordValues(recordId, nextValues);
   }
 
   async function handleSaveRecord(recordId: string, values: Record<string, unknown>) {
     setRecords((prev) =>
       prev.map((record) => (record.id === recordId ? { ...record, values } : record))
     );
-    await updateRecord(recordId, database.id, values);
+    await persistRecordValues(recordId, values);
   }
 
   async function handleDeleteRecord(recordId: string) {
@@ -358,11 +491,12 @@ export default function DatabaseView({ database, fields: initialFields, records:
   // Field handlers
   // ---------------------------------------------------------------------------
 
-  async function handleCreateField(name: string, type: FieldType, options: SelectOption[]) {
+  async function handleCreateField(name: string, type: FieldType, options: FieldOptions) {
     startTransition(async () => {
       const result = await createField(database.id, { name, type, options });
       if (result.success) {
         setFields((prev) => [...prev, result.field as unknown as FieldRow]);
+        router.refresh();
       }
     });
   }
@@ -372,7 +506,7 @@ export default function DatabaseView({ database, fields: initialFields, records:
     await updateField(fieldId, database.id, { name });
   }
 
-  async function handleUpdateFieldOptions(fieldId: string, options: SelectOption[]) {
+  async function handleUpdateFieldOptions(fieldId: string, options: FieldOptions) {
     setFields((prev) => prev.map((field) => (field.id === fieldId ? { ...field, options } : field)));
     await updateField(fieldId, database.id, { options });
   }
@@ -443,9 +577,12 @@ export default function DatabaseView({ database, fields: initialFields, records:
             style={{ minWidth: 140 }}
           >
             <TableCell
+              fieldId={field.id}
               type={field.type}
               value={record.values[field.id]}
               options={field.options}
+              relationCandidates={relationCandidatesByFieldId.get(field.id) ?? []}
+              isReadOnly={field.type === "ROLLUP" || field.type === "FORMULA"}
               isEditing={
                 editingCell?.recordId === record.id &&
                 editingCell?.fieldId === field.id
@@ -453,6 +590,7 @@ export default function DatabaseView({ database, fields: initialFields, records:
               onStartEdit={() => setEditingCell({ recordId: record.id, fieldId: field.id })}
               onSave={(value) => handleSaveCell(record.id, field.id, value)}
               onCancel={() => setEditingCell(null)}
+              onUploadFile={field.type === "FILE" ? handleUploadFile : undefined}
             />
           </td>
         ))}
@@ -726,7 +864,7 @@ export default function DatabaseView({ database, fields: initialFields, records:
       {activeView === "KANBAN" && (
         <KanbanView
           fields={sortedFields}
-          records={records}
+          records={runtimeRecords}
           groupFieldId={kanbanGroupFieldId}
           onGroupFieldChange={handleKanbanGroupFieldChange}
           onUpdateRecord={handleSaveRecord}
@@ -741,7 +879,7 @@ export default function DatabaseView({ database, fields: initialFields, records:
       {activeView === "CALENDAR" && (
         <CalendarView
           fields={sortedFields}
-          records={records}
+          records={runtimeRecords}
           onAddRecord={handleAddRecordFromCalendar}
           onSelectRecord={setSelectedRecordId}
         />
@@ -753,7 +891,7 @@ export default function DatabaseView({ database, fields: initialFields, records:
       {activeView === "GALLERY" && (
         <GalleryView
           fields={sortedFields}
-          records={records}
+          records={runtimeRecords}
           imageFieldId={galleryImageFieldId}
           onImageFieldChange={handleGalleryImageFieldChange}
           onSelectRecord={setSelectedRecordId}
@@ -767,7 +905,7 @@ export default function DatabaseView({ database, fields: initialFields, records:
       {activeView === "LIST" && (
         <ListView
           fields={sortedFields}
-          records={records}
+          records={runtimeRecords}
           onSelectRecord={setSelectedRecordId}
           onAddRecord={() => { void handleAddRecord(); }}
         />
@@ -779,7 +917,7 @@ export default function DatabaseView({ database, fields: initialFields, records:
       {activeView === "TIMELINE" && (
         <TimelineView
           fields={sortedFields}
-          records={records}
+          records={runtimeRecords}
           startFieldId={timelineStartFieldId}
           endFieldId={timelineEndFieldId}
           onStartFieldChange={handleTimelineStartFieldChange}
@@ -794,14 +932,26 @@ export default function DatabaseView({ database, fields: initialFields, records:
         <RecordDetailPanel
           record={selectedRecord}
           fields={sortedFields}
+          relationCandidatesByFieldId={relationCandidatesByFieldId}
           onClose={() => setSelectedRecordId(null)}
           onSave={handleSaveRecord}
+          onUploadFile={handleUploadFile}
         />
       )}
 
       {/* Add field modal - only from TABLE view */}
       {showAddField && (
         <AddFieldModal
+          fields={sortedFields}
+          databases={relationDatabases.map((db) => ({
+            id: db.id,
+            title: db.title,
+            fields: db.fields.map((field) => ({
+              id: field.id,
+              name: field.name,
+              type: field.type,
+            })),
+          }))}
           onClose={() => setShowAddField(false)}
           onCreate={handleCreateField}
         />

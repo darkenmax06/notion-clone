@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { FieldType } from "@prisma/client";
+import { normalizeFieldOptions } from "@/lib/database/field-options";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -9,14 +10,16 @@ const CreateFieldSchema = z.object({
   name: z.string().min(1).max(255),
   type: z.nativeEnum(FieldType),
   options: z
-    .array(
-      z.object({
-        value: z.string().min(1),
-        color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-      })
-    )
-    .optional()
-    .default([]),
+    .union([
+      z.array(
+        z.object({
+          value: z.string().min(1),
+          color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+        })
+      ),
+      z.record(z.unknown()),
+    ])
+    .optional(),
 });
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
@@ -39,7 +42,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       data: {
         name: data.name,
         type: data.type,
-        options: data.options,
+        options: normalizeFieldOptions(data.type, data.options),
         position: (lastField?.position ?? -1) + 1,
         databaseId,
       },

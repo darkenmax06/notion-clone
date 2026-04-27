@@ -7,6 +7,7 @@ import { es } from "date-fns/locale";
 import { Plus } from "lucide-react";
 import { FieldType } from "@prisma/client";
 import type { FieldRow, RecordRow } from "./DatabaseView";
+import { getSelectOptions } from "@/lib/database/field-options";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 
 // ---------------------------------------------------------------------------
@@ -130,7 +131,7 @@ function buildEvents(
 
       const statusValue = selectField ? String(r.values[selectField.id] ?? "") : "";
       const color =
-        selectField?.options?.find((o) => o.value === statusValue)?.color ?? "#6366f1";
+        getSelectOptions(selectField?.options).find((option) => option.value === statusValue)?.color ?? "#6366f1";
 
       return { recordId: r.id, title, start, end, allDay, color, resource: r } as CalendarEvent;
     });

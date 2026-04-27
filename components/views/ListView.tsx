@@ -30,6 +30,10 @@ function formatValue(field: FieldRow, value: unknown): string {
   if (field.type === FieldType.CHECKBOX) return value === true ? "Completado" : "Pendiente";
   if (field.type === FieldType.DATE) return String(value).slice(0, 10);
   if (Array.isArray(value)) return value.map((item) => String(item)).join(", ");
+  if (typeof value === "object" && value !== null) {
+    const maybeName = (value as { name?: unknown }).name;
+    if (typeof maybeName === "string") return maybeName;
+  }
   return String(value);
 }
 

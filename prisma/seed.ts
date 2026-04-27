@@ -15,6 +15,7 @@ async function main() {
   console.log("✓ Extensión pg_trgm habilitada");
 
   console.log("Limpiando datos existentes…");
+  await prisma.recordRelation.deleteMany();
   await prisma.record.deleteMany();
   await prisma.field.deleteMany();
   await prisma.database.deleteMany();
@@ -630,6 +631,10 @@ async function main() {
     data: { name: "Último contacto", type: "DATE", position: 3, databaseId: contactDb.id },
   });
 
+  const cRateField = await prisma.field.create({
+    data: { name: "Tarifa (USD/h)", type: "NUMBER", position: 4, databaseId: contactDb.id },
+  });
+
   await prisma.record.createMany({
     data: [
       {
@@ -639,6 +644,7 @@ async function main() {
           [cRoleField.id]: "CEO",
           [cStatusField.id]: "Activo",
           [cDateField.id]: "2026-04-15",
+          [cRateField.id]: 120,
         },
         databaseId: contactDb.id,
       },
@@ -649,6 +655,7 @@ async function main() {
           [cRoleField.id]: "Dev Lead",
           [cStatusField.id]: "Activo",
           [cDateField.id]: "2026-04-17",
+          [cRateField.id]: 95,
         },
         databaseId: contactDb.id,
       },
@@ -659,10 +666,119 @@ async function main() {
           [cRoleField.id]: "Designer",
           [cStatusField.id]: "Lead",
           [cDateField.id]: "2026-04-10",
+          [cRateField.id]: 80,
         },
         databaseId: contactDb.id,
       },
     ],
+  });
+
+  // -------------------------------------------------------------------------
+  // Fase 8: campos avanzados en DB de tareas
+  // -------------------------------------------------------------------------
+  const taskRelationField = await prisma.field.create({
+    data: {
+      name: "Contactos",
+      type: "RELATION",
+      position: 9,
+      options: { relationDatabaseId: contactDb.id },
+      databaseId: taskDb.id,
+    },
+  });
+
+  await prisma.field.create({
+    data: {
+      name: "Tarifa media (rollup)",
+      type: "ROLLUP",
+      position: 10,
+      options: {
+        relationFieldId: taskRelationField.id,
+        targetFieldId: cRateField.id,
+        function: "avg",
+      },
+      databaseId: taskDb.id,
+    },
+  });
+
+  await prisma.field.create({
+    data: {
+      name: "Duración estimada (días)",
+      type: "FORMULA",
+      position: 11,
+      options: { expression: "DAYS_BETWEEN({Inicio}, {Fin})" },
+      databaseId: taskDb.id,
+    },
+  });
+
+  const taskPersonField = await prisma.field.create({
+    data: {
+      name: "Asignado",
+      type: "PERSON",
+      position: 12,
+      databaseId: taskDb.id,
+    },
+  });
+
+  const taskFileField = await prisma.field.create({
+    data: {
+      name: "Adjunto",
+      type: "FILE",
+      position: 13,
+      databaseId: taskDb.id,
+    },
+  });
+
+  const seededContacts = await prisma.record.findMany({
+    where: { databaseId: contactDb.id, isDeleted: false },
+    orderBy: { position: "asc" },
+  });
+
+  const assignees = ["Ana García", "Carlos López", "María Torres"];
+
+  for (const [index, taskRecord] of seededTaskRecords.entries()) {
+    const currentValues = (taskRecord.values ?? {}) as Record<string, unknown>;
+    const assignee = assignees[index % assignees.length];
+    await prisma.record.update({
+      where: { id: taskRecord.id },
+      data: {
+        values: {
+          ...currentValues,
+          [taskPersonField.id]: assignee,
+          [taskFileField.id]: {
+            name: `brief-${index + 1}.pdf`,
+            url: `/uploads/brief-${index + 1}.pdf`,
+            mimeType: "application/pdf",
+          },
+        } as Prisma.InputJsonValue,
+      },
+    });
+  }
+
+  const relationRows = seededTaskRecords.flatMap((taskRecord, index) => {
+    const primary = seededContacts[index % seededContacts.length];
+    const rows = [
+      {
+        sourceRecordId: taskRecord.id,
+        targetRecordId: primary.id,
+        fieldId: taskRelationField.id,
+      },
+    ];
+
+    if (index % 3 === 0 && seededContacts.length > 1) {
+      const secondary = seededContacts[(index + 1) % seededContacts.length];
+      rows.push({
+        sourceRecordId: taskRecord.id,
+        targetRecordId: secondary.id,
+        fieldId: taskRelationField.id,
+      });
+    }
+
+    return rows;
+  });
+
+  await prisma.recordRelation.createMany({
+    data: relationRows,
+    skipDuplicates: true,
   });
 
   console.log("✅ Seed completado:");
@@ -671,9 +787,9 @@ async function main() {
   console.log("     · 4 templates del sistema");
   console.log("     · 2 páginas en papelera (padre + hija)");
   console.log("   - 3 bases de datos:");
-  console.log("     · Tareas del proyecto: 9 campos, 9 registros [KANBAN] + config Gallery/Timeline");
+  console.log("     · Tareas del proyecto: 14 campos, 9 registros [KANBAN] + relation/rollup/formula/person/file");
   console.log("     · Eventos del mes: 6 campos (Hora inicio + Hora fin TIME), 9 registros [CALENDAR]");
-  console.log("     · Contactos: 4 campos, 3 registros [LIST]");
+  console.log("     · Contactos: 5 campos, 3 registros [LIST]");
 }
 
 main()

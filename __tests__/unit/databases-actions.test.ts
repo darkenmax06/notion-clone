@@ -11,6 +11,7 @@ jest.mock("@/lib/prisma", () => ({
     },
     field: {
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
@@ -129,6 +130,31 @@ describe("createField", () => {
     );
   });
 
+  it("stores object options for RELATION fields", async () => {
+    (mockField.findFirst as jest.Mock).mockResolvedValue({ position: 2 });
+    (mockField.create as jest.Mock).mockResolvedValue({
+      id: FIELD_ID,
+      name: "Contacto",
+      type: "RELATION",
+      position: 3,
+    });
+
+    const result = await createField(DB_ID, {
+      name: "Contacto",
+      type: "RELATION",
+      options: { relationDatabaseId: "ctest00000000000000000099" },
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockField.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          options: { relationDatabaseId: "ctest00000000000000000099" },
+        }),
+      })
+    );
+  });
+
   it("rejects invalid field type", async () => {
     await expect(createField(DB_ID, { name: "Test", type: "INVALID" as never })).rejects.toThrow();
   });
@@ -138,6 +164,7 @@ describe("updateField", () => {
   beforeEach(() => jest.clearAllMocks());
 
   it("updates field name", async () => {
+    (mockField.findUnique as jest.Mock).mockResolvedValue({ id: FIELD_ID, type: "TEXT" });
     (mockField.update as jest.Mock).mockResolvedValue({ id: FIELD_ID, name: "Nuevo nombre" });
 
     const result = await updateField(FIELD_ID, DB_ID, { name: "Nuevo nombre" });
